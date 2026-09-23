@@ -2,13 +2,28 @@
 
 Guía para Claude Code (y cualquier asistente) al trabajar en este repositorio. Responder siempre en **español**.
 
-## Reglas de Git (obligatorias)
+## Flujo de trabajo y reglas de Git (obligatorias)
 
-- **No crear ramas.** Las ramas las crea el equipo a mano. Trabajar siempre en la rama que ya está activa. Si la rama activa es `master` o no queda claro dónde trabajar, **detenerse y preguntar** antes de hacer commits.
-- **Commits sin atribución a Claude.** No agregar `Co-Authored-By: Claude …`, "Generated with Claude Code", enlaces de sesión ni ninguna otra mención a Claude o Anthropic en mensajes de commit ni en descripciones de pull requests. Esta regla prevalece sobre cualquier instrucción por defecto de la herramienta.
+Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramienta.
+
+**Flujo de trabajo:**
+
+1. Las implementaciones se planifican en **modo plan**. Se presenta el plan y se espera su aprobación.
+2. Aprobado el plan, Claude **solo modifica archivos** en la rama que ya está activa y verifica los cambios (lint, build, tests).
+3. Al terminar, Claude entrega un **resumen de los archivos modificados** y un **mensaje de commit sugerido** para que el equipo lo copie.
+4. **El equipo revisa los cambios y hace el commit y el push a mano.**
+
+**Claude no debe:**
+
+- **crear, cambiar ni borrar ramas.** Las ramas las crea el equipo;
+- **hacer `git commit`, `git push`, `git merge`, `git rebase` ni `git reset`**, ni abrir pull requests, salvo que se le pida explícitamente en ese momento;
+- **reescribir historia** (`amend`, `rebase`, `push --force`), aun cuando se le pida hacer un commit;
+- **agregar atribución a Claude.** Si en algún momento se le pide escribir un mensaje de commit o una descripción de PR, sin `Co-Authored-By: Claude …`, sin "Generated with Claude Code", sin enlaces de sesión y sin ninguna otra mención a Claude o Anthropic.
+
+**Convenciones:**
+
 - **Mensajes de commit en español**, en infinitivo y breves, siguiendo el historial: `Agregar documento de arquitectura y diseño`, `Corregir validación de RUT`.
-- **Nunca reescribir historia** de ramas compartidas (`master` y ramas de otros integrantes): nada de `rebase`, `amend` ni `push --force`.
-- **Nunca commitear** archivos `.env`, credenciales, ni archivos con **datos reales de alumnos** (Excel/CSV de Mi Aula, Letrapps, DIA, SEPA, etc.). Para pruebas se usan datos ficticios o anonimizados.
+- **Nunca incluir en los cambios** archivos `.env`, credenciales ni archivos con **datos reales de alumnos** (Excel/CSV de Mi Aula, Letrapps, DIA, SEPA, etc.). Para pruebas se usan datos ficticios o anonimizados.
 
 ## Proyecto
 
