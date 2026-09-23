@@ -24,7 +24,11 @@ El proyecto está estructurado en un monorepo separando el cliente y el servidor
 *   **Backend:** NestJS (TypeScript)
 *   **Base de Datos Principal:** MongoDB (Modelo Documental)
 *   **Caché y Colas:** Redis (Para procesamiento de Excels en segundo plano)
-*   **Despliegue:** Docker / Render / Railway
+*   **Despliegue:** Docker (servidor propio de la escuela; hosting externo como alternativa)
+
+## Documentación
+
+- [Arquitectura y diseño](docs/ARQUITECTURA.md): modelo de datos, motor de alertas, carga de datos, roles y permisos, y privacidad (Ley 21.719).
 
 ## Estructura del Repositorio
 
