@@ -34,6 +34,8 @@ Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramien
 ### Requerimientos clave (resumen)
 
 - **Mínimo aceptable, por alumno:** notas por curso y asignatura y asistencia (exportadas desde **Mi Aula**), resultados de **Letrapps** y **DIA**, y **SEPA** en 2° básico. La prioridad es **Lenguaje y Matemática**.
+- **Mi Aula** sigue siendo el sistema donde se registran la asistencia y las notas. La plataforma importa sus exportaciones; no las reemplaza ni registra asistencia directamente.
+- **Letrapps** es la prueba de velocidad lectora de la escuela; sus resultados se registran por alumno.
 - **SIMCE:** solo resultados agregados de escuela, en un módulo aparte (por definir). No alimenta alertas individuales. 4° rinde todos los años; 6° y 8° se alternan.
 - **Alertas de asistencia**, con criterios de la escuela y umbrales configurables en `reglasAlerta`, nunca fijos en el código:
   - ≥ 90% → Esperado
@@ -45,9 +47,11 @@ Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramien
 
 ### Roles
 
-En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecnico`, `coordinadoraConvivencia`, `evaluadora`, `orientador`, `duplaPsicosocial`, `coordinadoraPie`.
+En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecnico`, `coordinadoraConvivencia`, `evaluadora`, `orientador`, `duplaPsicosocial`, `coordinadoraPie`, `docente`.
 
 - Los permisos se guardan en la base de datos (colección `roles`) y la Directora los edita. No se codifican por rol en el código.
+- **Alcance por curso:** `roles.alcance` es `escuela` o `cursosAsignados`. Con `cursosAsignados` (hoy, `docente`) el usuario solo ve y carga datos de los cursos en `usuarios.cursoIds`. Esto se filtra en los servicios, no solo en el guard. Ver sección 7.4 del documento.
+- El `docente` sube notas y asistencia, ve la ficha y las alertas, y registra observaciones (no psicosociales ni PIE), siempre solo de sus cursos.
 - Cada endpoint exige su permiso con `@RequierePermisos('…')`.
 
 ### Autenticación
@@ -66,7 +70,7 @@ Monorepo sin `package.json` raíz: cada carpeta se instala y ejecuta por separad
 | `frontend/` | React 19 + Vite + TypeScript |
 | `docs/` | Documentación del proyecto |
 
-Despliegue previsto: Docker Compose en un servidor propio de la escuela, detrás de su proxy. MongoDB y Redis solo en la red interna.
+Despliegue: Docker Compose. **El hosting está por definir** (servidor de la escuela, servidor nacional o PaaS externo; ver sección 8.5 del documento). No usar servicios propios de un proveedor: todo se configura por variables de entorno. MongoDB y Redis nunca quedan expuestos a internet.
 
 ## Comandos
 
@@ -106,7 +110,8 @@ Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la c
 El sistema trata datos de menores, y algunos son **sensibles** (datos PIE y observaciones psicosociales). Al implementar:
 
 - **Minimización:** importar solo las columnas necesarias y borrar el archivo original después de procesarlo.
-- Datos PIE y psicosociales accesibles solo con los permisos `pie.ver` y `observaciones.verPsicosocial`.
+- Datos PIE y psicosociales accesibles (para verlos y para crearlos) solo con los permisos `pie.ver` y `observaciones.verPsicosocial`.
+- Las reglas de la sección 8.4 del documento se implementan siempre, sea cual sea el hosting.
 - Registrar en `registroAuditoria` los accesos a fichas, las cargas, las exportaciones y los cambios de permisos.
 - No registrar en logs datos personales (RUT, nombres, notas) más allá de lo necesario.
 - Ver sección 8 de `docs/ARQUITECTURA.md`.
