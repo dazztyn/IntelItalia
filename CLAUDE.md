@@ -9,16 +9,23 @@ Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramien
 **Flujo de trabajo:**
 
 1. Las implementaciones se planifican en **modo plan**. Se presenta el plan y se espera su aprobación.
-2. Aprobado el plan, Claude **solo modifica archivos** en la rama que ya está activa y verifica los cambios (lint, build, tests).
+2. Aprobado el plan, Claude modifica los archivos en la rama activa o, si el cambio lo necesita, **crea una rama nueva** para implementarlo (ver más abajo), y verifica los cambios (lint, build, tests).
 3. Al terminar, Claude entrega un **resumen de los archivos modificados** y un **mensaje de commit sugerido** para que el equipo lo copie.
 4. **El equipo revisa los cambios y hace el commit y el push a mano.**
 
+**Ramas:**
+
+- Claude **puede crear ramas** cuando un cambio lo necesita, p. ej. para separar una implementación del resto del trabajo.
+- La rama nueva parte de la rama base actualizada (`master`, salvo que se indique otra) y lleva un nombre descriptivo en español, en minúsculas y con guiones: `rol-docente`, `carga-mi-aula`.
+- Al crearla, Claude avisa el nombre de la rama y desde cuál partió.
+
 **Claude no debe:**
 
-- **crear, cambiar ni borrar ramas.** Las ramas las crea el equipo;
+- **borrar ramas** ni cambiar de rama dejando cambios sin guardar;
 - **hacer `git commit`, `git push`, `git merge`, `git rebase` ni `git reset`**, ni abrir pull requests, salvo que se le pida explícitamente en ese momento;
-- **reescribir historia** (`amend`, `rebase`, `push --force`), aun cuando se le pida hacer un commit;
-- **agregar atribución a Claude.** Si en algún momento se le pide escribir un mensaje de commit o una descripción de PR, sin `Co-Authored-By: Claude …`, sin "Generated with Claude Code", sin enlaces de sesión y sin ninguna otra mención a Claude o Anthropic.
+- **reescribir historia** (`amend`, `rebase`, `push --force`), aun cuando se le pida hacer un commit.
+
+**Atribución:** se permite la atribución a Claude en los commits y PR (p. ej. `Co-Authored-By`). La autoría del proyecto queda registrada en el repositorio.
 
 **Convenciones:**
 
