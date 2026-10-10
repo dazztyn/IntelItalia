@@ -325,6 +325,21 @@ Resultados **agregados de la escuela**, sin datos por alumno.
     ]
   }
 }
+
+{
+  _id: ObjectId,
+  codigo: "rendimiento",
+  descripcion: "Umbrales de notas por área y promedio general",
+  activa: true,
+  parametros: {
+    umbralAlto: 4.0,                 // promedio < 4.0 → alta
+    umbralPreventivo: 4.5,           // 4.0 ≤ promedio < 4.5 → media
+    areasPrioritarias: ["lenguaje", "matematica"],
+    general: {
+      severidadMaximaSinArea: "media" // tope si Lenguaje y Matemática no tienen alerta
+    }
+  }
+}
 ```
 
 **`alertas`**: cada alerta detectada, con su historial.
@@ -444,14 +459,27 @@ Criterios entregados por la escuela:
 
 #### b) Rendimiento por área (notas)
 
-Por cada área (`lenguaje`, `matematica`) y para el promedio general:
+Se importan las notas de **todas** las asignaturas. Con ellas se calculan tres promedios por alumno: **Lenguaje** (asignaturas con `area: "lenguaje"`), **Matemática** (`area: "matematica"`) y **general** (todas). Las asignaturas con `area: "otra"` no generan alertas propias; solo cuentan en el promedio general.
+
+**Lenguaje y Matemática** son la prioridad:
 
 | Condición | Severidad |
 |-----------|-----------|
 | Promedio < 4.0 | alta |
 | 4.0 ≤ promedio < 4.5 (umbral preventivo) | media |
 
+**Promedio general**, con un tope de severidad:
+
+| Condición | Severidad |
+|-----------|-----------|
+| Promedio general < 4.5 y Lenguaje y Matemática **sin** alerta | media (**tope**: como máximo 🟡 amarillo) |
+| Promedio general < 4.0 y Lenguaje o Matemática **con** alerta | alta |
+| 4.0 ≤ promedio general < 4.5 y Lenguaje o Matemática **con** alerta | media |
+
+- **Por qué el tope:** el promedio general se tiene en cuenta, pero por sí solo no enciende el naranjo ni el rojo. Esos colores quedan para Lenguaje, Matemática, la asistencia y las evaluaciones externas, que son la prioridad de la escuela.
 - **"Solo en Lenguaje" / "Solo en Matemática":** si hay alerta en un área y no en la otra, el resumen del alumno lo dice explícitamente (p. ej. *"Rendimiento bajo solo en Lenguaje"*).
+- **Solo el promedio general bajo:** el resumen lo aclara, p. ej. *"Promedio general bajo (Lenguaje y Matemática dentro de lo esperado)"*.
+- Los umbrales (4.0 / 4.5) y el tope se configuran en `reglasAlerta` (ver [sección 3.9](#39-colecciones-de-alertas)).
 - **PK y K:** no tienen notas numéricas, así que la regla usa los conceptos (p. ej. mayoría de "Por lograr"). ⏳ Se define al ver el formato de Mi Aula para estos niveles.
 
 #### c) Evaluaciones externas
@@ -463,7 +491,7 @@ Por cada área (`lenguaje`, `matematica`) y para el promedio general:
 
 #### d) Alertas cruzadas
 
-- **Baja asistencia + bajo rendimiento:** si hay alerta de asistencia (reiterada o peor) y además alerta de rendimiento en cualquier área, la severidad **sube un nivel**. Es el caso central de la problemática.
+- **Baja asistencia + bajo rendimiento:** si hay alerta de asistencia (reiterada o peor) y además alerta de rendimiento en Lenguaje o Matemática, la severidad **sube un nivel**. Es el caso central de la problemática. La alerta de promedio general con tope no hace subir el nivel.
 - **Discrepancia entre notas y evaluaciones externas:** promedio del área ≥ 5.0, pero el resultado externo de la misma área está en nivel `bajo`, o al revés. Severidad **informativa**: no es necesariamente un problema del alumno, pero muestra las *discrepancias* entre fuentes que motivaron el proyecto.
 
 #### e) Tendencia
