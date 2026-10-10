@@ -37,7 +37,11 @@ Centralizar los datos de cada alumno en una **ficha única**. A partir de esa in
 
 ### Usuarios
 
-Personal directivo y profesionales de la escuela, organizados en ocho roles (ver [sección 7](#7-autenticación-roles-y-permisos)). No hay acceso para apoderados ni alumnos en esta etapa.
+Personal directivo, profesionales y docentes de la escuela, organizados en nueve roles (ver [sección 7](#7-autenticación-roles-y-permisos)). Los docentes acceden solo a los cursos que tienen asignados. No hay acceso para apoderados ni alumnos en esta etapa.
+
+### Relación con Mi Aula
+
+**Mi Aula sigue siendo el sistema donde se registran la asistencia y las notas.** IntelItalia no lo reemplaza ni duplica ese registro: importa las exportaciones de Mi Aula para completar la ficha del alumno y cruzarlas con las demás fuentes (Letrapps, DIA, SEPA). Registrar la asistencia directamente en la plataforma queda como posible mejora futura (ver [sección 10.2](#102-hoja-de-ruta-propuesta)).
 
 ### Alcance del MVP (mínimo aceptable)
 
@@ -46,7 +50,7 @@ Lo que la plataforma **debe centralizar y usar para emitir alertas**, siempre **
 | # | Fuente | Datos | Uso en alertas |
 |---|--------|-------|----------------|
 | 1 | **Mi Aula** (exportación) | **Notas por curso y asignatura** y **asistencia** | Base de las alertas de rendimiento y de inasistencia |
-| 2 | **Letrapps** | Resultados de lectura | Alertas de Lenguaje |
+| 2 | **Letrapps** | Resultados de la prueba de velocidad lectora | Alertas de Lenguaje |
 | 3 | **DIA** (Agencia de Calidad) | Resultados de Lectura y Matemática | Alertas de Lenguaje y Matemática |
 | 4 | **SEPA** | Resultados de 2° básico | Alertas de Lenguaje y Matemática |
 
@@ -123,9 +127,10 @@ La **prioridad** son las áreas de **Lenguaje y Matemática**.
 ### Despliegue
 
 - **Docker Compose** con cuatro servicios: `api` (NestJS, incluye los workers), `web` (frontend compilado servido por Nginx), `mongo` y `redis`.
-- Pensado para el **servidor propio de la escuela**, detrás de su proxy. HTTPS termina en el proxy o en el Nginx interno.
+- ⏳ **El hosting está por definir.** Hay tres escenarios posibles: el **servidor propio de la escuela**, un **servidor nacional** (datacenter en Chile) o un **PaaS externo**. Sus implicancias legales están en la [sección 8.5](#85-escenarios-de-hosting).
+- El diagrama muestra el escenario del servidor de la escuela, detrás de su proxy. HTTPS termina en el proxy o en el Nginx interno.
 - **Solo el proxy queda expuesto a la red.** MongoDB y Redis quedan en la red interna de Docker, con autenticación activada y sin puertos publicados.
-- El mismo `docker-compose.yml` sirve si luego se opta por un hosting externo (ver [sección 8](#8-privacidad-y-protección-de-datos-ley-21719) sobre transferencia internacional).
+- **Portabilidad:** el mismo `docker-compose.yml` y la misma configuración sirven para los tres escenarios. Los servicios externos se conectan por variables de entorno (`MONGO_URI`, `REDIS_URL`, etc.), así que se puede usar una base de datos administrada sin cambiar el código. No se usan servicios propios de un proveedor.
 - La configuración va en variables de entorno (`.env`, nunca en el repositorio), validadas al iniciar con `@nestjs/config`.
 
 ### Convención de nombres
@@ -362,10 +367,10 @@ Resultados **agregados de la escuela**, sin datos por alumno.
 
 | Colección | Campos principales | Notas |
 |-----------|-------------------|-------|
-| `observaciones` | `alumnoId`, `autorId`, `tipo` (pedagogica, convivencia, psicosocial, pie, general), `texto`, `confidencial`, `fecha` | Las de tipo `psicosocial` y `pie` son **sensibles** y quedan restringidas por rol |
+| `observaciones` | `alumnoId`, `autorId`, `tipo` (pedagogica, convivencia, psicosocial, pie, general), `texto`, `confidencial`, `fecha` | Las de tipo `psicosocial` y `pie` son **sensibles**. Para **crearlas o verlas** hay que tener `observaciones.verPsicosocial` o `pie.ver`, respectivamente. Sin esos permisos solo se crean las de tipo `pedagogica`, `convivencia` y `general` |
 | `cargas` | `fuente` (miAulaNotas, miAulaAsistencia, letrapps, dia, sepa, simce), `nombreArchivo`, `usuarioId`, `estado`, `filasTotales`, `filasOk`, `errores[]` (`fila`, `campo`, `mensaje`), `iniciadaEn`, `finalizadaEn` | El archivo original **no** se conserva después de procesarlo |
-| `usuarios` | `correo`, `nombre`, `rol`, `activo`, `ultimoAcceso` | Lista blanca: sin documento aquí no hay acceso |
-| `roles` | `codigo`, `nombre`, `jerarquia`, `permisos[]` | Editables por la Directora |
+| `usuarios` | `correo`, `nombre`, `rol`, `cursoIds[]`, `activo`, `ultimoAcceso` | Lista blanca: sin documento aquí no hay acceso. `cursoIds` son los cursos asignados; se usan cuando el rol tiene `alcance: "cursosAsignados"` |
+| `roles` | `codigo`, `nombre`, `jerarquia`, `alcance` (`escuela` \| `cursosAsignados`), `permisos[]` | Editables por la Directora. `alcance` limita los datos que ve el rol (ver [sección 7.4](#74-alcance-por-curso)) |
 | `registroAuditoria` | `usuarioId`, `accion`, `recurso`, `recursoId`, `alumnoId`, `ip`, `fecha` | Solo se agregan registros, nunca se editan. Se conservan por un tiempo definido (⏳ a acordar) |
 
 ---
@@ -376,7 +381,7 @@ Resultados **agregados de la escuela**, sin datos por alumno.
 
 | Instrumento | Nivel de detalle | Áreas | Cursos | Momentos | Estado |
 |-------------|-----------------|-------|--------|----------|--------|
-| **Letrapps** | Por alumno | Lenguaje (lectura: velocidad y comprensión lectora) | ⏳ a confirmar | ⏳ varias mediciones al año | **MVP** |
+| **Letrapps** | Por alumno | Lenguaje: es la **prueba de velocidad lectora** de la escuela (⏳ métricas a confirmar con el formato, p. ej. palabras por minuto y comprensión) | ⏳ a confirmar | ⏳ varias mediciones al año | **MVP** |
 | **DIA** (Agencia de Calidad) | Por alumno | Lectura y Matemática (el área socioemocional queda fuera de alcance) | ⏳ a confirmar | Diagnóstico, monitoreo intermedio, cierre | **MVP** |
 | **SEPA** | Por alumno | Lenguaje y Matemática | 2° básico | ⏳ a confirmar | **MVP** |
 | **SIMCE** | Agregado de escuela | Lectura, Matemática (y otras según el año) | 4° todos los años; 6° y 8° se alternan | Anual | Módulo aparte, por definir |
@@ -515,6 +520,7 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
 - **Vista previa:** antes de confirmar, el usuario puede validar el archivo y ver cuántas filas se cargarían y qué errores hay, sin guardar nada.
 - **Validación del RUT:** se normaliza (quita puntos, espacios y pasa el DV a mayúscula) y se valida el dígito verificador. Un RUT inválido es error de fila, no de todo el archivo.
 - **Alumnos:** un alumno que no existe se crea desde la carga de Mi Aula, que es la fuente oficial de matrícula. Las cargas de evaluaciones externas **no** crean alumnos; si no se encuentra el RUT, la fila se marca como error.
+- **Alcance por curso:** si quien sube el archivo tiene un rol con `alcance: "cursosAsignados"` (p. ej. `docente`), las filas de cursos que no tiene asignados se marcan como **error de fila** y no se cargan. Esto incluye la creación de alumnos desde Mi Aula.
 - **Idempotencia:** se usan upserts sobre las claves únicas (sección 3). Cargar dos veces el mismo archivo no duplica datos.
 - **Minimización:** solo se leen las columnas mapeadas y el resto se descarta. El archivo original se elimina después de procesarlo.
 - **Trazabilidad:** cada dato guarda el `cargaId` que lo originó.
@@ -560,29 +566,48 @@ En orden jerárquico:
 | 6 | `orientador` | Orientador(a) |
 | 7 | `duplaPsicosocial` | Dupla Psicosocial |
 | 8 | `coordinadoraPie` | Coordinador(a) PIE |
+| 9 | `docente` | Docente — solo sus cursos asignados |
 
 ### 7.3 Permisos (propuesta a validar con la escuela)
 
 Los permisos se guardan en la colección `roles` y la **Directora puede editarlos** desde la plataforma. El backend los exige con un decorador por ruta, por ejemplo `@RequierePermisos('alumnos.ver')`, y un guard global.
 
-| Permiso | Dir. | Insp. | UTP | Conv. | Eval. | Orient. | Dupla | PIE |
-|---------|:----:|:-----:|:---:|:-----:|:-----:|:-------:|:-----:|:---:|
-| `alumnos.ver` (ficha general, notas, asistencia, evaluaciones) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `alertas.ver` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `alertas.gestionar` (seguimiento / cierre) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `cargas.notas` (Mi Aula notas) | ✅ | — | ✅ | — | ✅ | — | — | — |
-| `cargas.asistencia` (Mi Aula asistencia) | ✅ | ✅ | ✅ | — | — | — | — | — |
-| `cargas.evaluaciones` (Letrapps, DIA, SEPA, SIMCE) | ✅ | — | ✅ | — | ✅ | — | — | — |
-| `observaciones.crear` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `observaciones.verPsicosocial` ⚠️ | ✅ | — | — | ✅ | — | ✅ | ✅ | — |
-| `pie.ver` ⚠️ | ✅ | — | ✅ | — | — | — | — | ✅ |
-| `simce.ver` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `reportes.exportar` | ✅ | — | ✅ | — | ✅ | — | — | — |
-| `reglasAlerta.gestionar` | ✅ | — | ✅ | — | — | — | — | — |
-| `usuarios.gestionar` | ✅ | — | — | — | — | — | — | — |
-| `auditoria.ver` | ✅ | — | — | — | — | — | — | — |
+| Permiso | Dir. | Insp. | UTP | Conv. | Eval. | Orient. | Dupla | PIE | Doc.¹ |
+|---------|:----:|:-----:|:---:|:-----:|:-----:|:-------:|:-----:|:---:|:-----:|
+| `alumnos.ver` (ficha general, notas, asistencia, evaluaciones) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `alertas.ver` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `alertas.gestionar` (seguimiento / cierre) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| `cargas.notas` (Mi Aula notas) | ✅ | — | ✅ | — | ✅ | — | — | — | ✅ |
+| `cargas.asistencia` (Mi Aula asistencia) | ✅ | ✅ | ✅ | — | — | — | — | — | ✅ |
+| `cargas.evaluaciones` (Letrapps, DIA, SEPA, SIMCE) | ✅ | — | ✅ | — | ✅ | — | — | — | — |
+| `observaciones.crear` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `observaciones.verPsicosocial` ⚠️ | ✅ | — | — | ✅ | — | ✅ | ✅ | — | — |
+| `pie.ver` ⚠️ | ✅ | — | ✅ | — | — | — | — | ✅ | — |
+| `simce.ver` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | —² |
+| `reportes.exportar` | ✅ | — | ✅ | — | ✅ | — | — | — | — |
+| `reglasAlerta.gestionar` | ✅ | — | ✅ | — | — | — | — | — | — |
+| `usuarios.gestionar` | ✅ | — | — | — | — | — | — | — | — |
+| `auditoria.ver` | ✅ | — | — | — | — | — | — | — | — |
 
 ⚠️ Datos **sensibles** según la Ley 21.719 (ver sección 8). Aunque un rol esté alto en la jerarquía, no ve estos datos si no los necesita para su función.
+
+¹ **Docente:** todos sus permisos se limitan a los **cursos asignados** (ver [sección 7.4](#74-alcance-por-curso)). Puede ver la ficha y las alertas para tener contexto al registrar observaciones, pero no gestiona alertas. Solo crea observaciones de tipo `pedagogica`, `convivencia` y `general`.
+
+² El SIMCE son datos agregados de escuela, sin datos personales. Queda en "—" hasta validarlo con la escuela.
+
+### 7.4 Alcance por curso
+
+Además de los permisos, cada rol tiene un **`alcance`** guardado en `roles`. Así se cumple el principio de minimización sin codificar nada por rol:
+
+| `alcance` | Qué datos ve el rol | Roles (propuesta) |
+|-----------|---------------------|-------------------|
+| `escuela` | Todos los alumnos y cursos | Todos menos `docente` |
+| `cursosAsignados` | Solo los alumnos matriculados en los cursos de `usuarios.cursoIds` | `docente` |
+
+- **Dónde se aplica:** el guard de permisos revisa *qué* acción se puede hacer. Los servicios filtran *sobre qué datos* según `cursoIds`, en listados, dashboard, vista de curso, ficha, alertas, cargas (ver [sección 6.2](#62-reglas-de-la-carga)) y observaciones.
+- **Acceso fuera del alcance:** pedir la ficha de un alumno de otro curso responde **403** y el intento queda en `registroAuditoria`.
+- **Asignación:** la Directora asigna los cursos de cada usuario desde `/admin/usuarios`. ⏳ Por definir si se asignan como profesor jefe, por asignatura o ambos.
+- Un usuario con alcance `cursosAsignados` y sin cursos asignados no ve ningún alumno.
 
 ---
 
@@ -594,7 +619,7 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 
 - La **Ley 21.719** (publicada en diciembre de 2024) reemplaza casi por completo la Ley 19.628 sobre protección de la vida privada y crea la **Agencia de Protección de Datos Personales**. Entra en vigencia el **1 de diciembre de 2026** (verificar), en pleno desarrollo del proyecto.
 - **Responsable del tratamiento:** la escuela o el SLEP, que deciden para qué se usan los datos.
-- **Encargado del tratamiento:** el equipo de desarrollo, mientras tenga acceso a los datos. Solo puede tratarlos según las instrucciones del responsable y bajo confidencialidad. Se recomienda que el **convenio A+S** incluya una cláusula de tratamiento de datos.
+- **Encargado del tratamiento:** el equipo de desarrollo, mientras tenga acceso a los datos. Solo puede tratarlos según las instrucciones del responsable y bajo confidencialidad. Se recomienda que el **convenio A+S** incluya una cláusula de tratamiento de datos. Si el hosting queda en un proveedor (escenarios 2 y 3 de la [sección 8.5](#85-escenarios-de-hosting)), ese proveedor también es encargado.
 - **Base legal:** como organismo público, la escuela puede tratar los datos de sus alumnos dentro de sus funciones legales (educativas) sin pedir el consentimiento de cada apoderado. El límite es la **finalidad**: los datos se usan solo para el seguimiento pedagógico y de bienestar. Se recomienda **informar a las familias** que el tratamiento existe.
 - **Datos de niños, niñas y adolescentes:** siempre se tratan atendiendo a su **interés superior**. Esto refuerza todas las medidas siguientes.
 
@@ -618,28 +643,67 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 | **Conservación** | ⏳ Definir por cuánto tiempo se guardan los datos de alumnos retirados o egresados |
 | **Desarrollo** | **Nunca subir datos reales al repositorio.** En desarrollo y pruebas se usan datos ficticios generados. Los archivos de ejemplo se anonimizan (nombres y RUT) |
 
-### 8.4 Hosting y transferencia internacional
+### 8.4 Medidas que no dependen del hosting
 
-**Escenario actual (en evaluación): servidor propio de la escuela**
+Como el hosting todavía no está definido, el cumplimiento se apoya sobre todo en la **lógica de negocio** de la aplicación. Estas reglas se implementan **siempre**, en cualquiera de los escenarios de la [sección 8.5](#85-escenarios-de-hosting):
+
+| Regla de negocio | Cómo se implementa |
+|------------------|--------------------|
+| **Finalidad** | Solo hay funciones de seguimiento pedagógico, de asistencia y de bienestar. No hay integraciones que envíen datos a terceros |
+| **Minimización de columnas** | Cada parser lee solo las columnas mapeadas y el archivo original se borra al terminar (sección 6) |
+| **Minimización por curso** | Los roles con `alcance: "cursosAsignados"` solo ven y cargan datos de sus cursos (sección 7.4) |
+| **Datos sensibles** | Para crear o ver datos PIE y observaciones psicosociales hay que tener `pie.ver` u `observaciones.verPsicosocial`. Sin el permiso, la API ni siquiera devuelve esos campos |
+| **Mínimo privilegio** | Permisos por rol en la base de datos. El menú y los endpoints dependen de esos permisos |
+| **Auditoría** | `registroAuditoria` guarda (solo agregando registros) los accesos a fichas, los accesos denegados, las cargas, las exportaciones, las correcciones manuales y los cambios de usuarios, roles y permisos |
+| **Logs sin datos personales** | Los logs técnicos usan identificadores (`alumnoId`, `cargaId`), no RUT, nombres ni notas |
+| **Derechos de los titulares** | Exportar la ficha completa de un alumno, corregir datos (queda auditado), y bloquear o suprimir alumnos |
+| **Conservación** | Marcar a los alumnos retirados o egresados y aplicar la política de conservación (⏳ plazo por definir) |
+| **Filtraciones** | La auditoría permite saber qué datos y de qué alumnos se vieron comprometidos para avisar a la Agencia y a los afectados |
+| **Desarrollo** | Datos ficticios en desarrollo y pruebas. Nunca datos reales en el repositorio |
+
+### 8.5 Escenarios de hosting
+
+⏳ **Por definir.** La aplicación se diseña para funcionar igual en los tres escenarios (ver [sección 2](#despliegue)). Cambian las obligaciones legales y de operación:
+
+| | 1. Servidor de la escuela | 2. Servidor nacional | 3. PaaS externo |
+|---|---|---|---|
+| **Ubicación de los datos** | Chile, en la escuela | Chile, en un datacenter de un proveedor | Normalmente fuera de Chile |
+| **Transferencia internacional** | No | No | **Sí** |
+| **Encargados del tratamiento** | Solo el equipo de desarrollo (mientras tenga acceso) | El equipo y el proveedor de hosting | El equipo y el proveedor de hosting |
+| **Quién mantiene el servidor** | La escuela o el SLEP | Compartido con el proveedor | Sobre todo el proveedor |
+| **Requisito principal** | Capacidad técnica de la escuela | Contrato de encargo con el proveedor | Garantías para la transferencia y validación del SLEP |
+
+**1. Servidor propio de la escuela**
 
 - La aplicación se despliega en un **servidor de la escuela**, expuesto a través de su proxy.
 - Los datos quedan **en Chile y bajo control de la institución**, así que en principio **no hay transferencia internacional**. Esto facilita el cumplimiento.
-- **Obligaciones de este escenario.** La escuela o el SLEP queda a cargo de la seguridad física y lógica del servidor. Se necesita:
+- **Obligaciones.** La escuela o el SLEP queda a cargo de la seguridad física y lógica del servidor. Se necesita:
   - HTTPS en el proxy;
   - MongoDB y Redis **sin exponer a internet** (solo red interna, con autenticación);
   - cifrado del disco o de la base de datos;
   - **respaldos periódicos fuera del mismo servidor**;
   - un responsable de mantener actualizados el sistema operativo, Docker y las dependencias.
 
-**Escenario alternativo (por si acaso): hosting externo**
+**2. Servidor nacional (datacenter en Chile)**
 
-- Si se opta por un hosting externo con servidores fuera de Chile (Render, Railway, MongoDB Atlas u otros), **sí hay transferencia internacional** de datos personales, además de datos de menores y sensibles.
+- La aplicación corre en un VPS o servidor de un proveedor con **datacenter en Chile**.
+- **No hay transferencia internacional** mientras los datos y los respaldos se queden en Chile. Hay que confirmar con el proveedor dónde guarda los respaldos.
+- El proveedor pasa a ser **encargado del tratamiento**. Hace falta:
+  - un **contrato de encargo** que fije confidencialidad, medidas de seguridad, el deber de avisar si hay filtraciones y la devolución o borrado de los datos al terminar el servicio;
+  - las mismas medidas técnicas del escenario 1 (HTTPS, MongoDB y Redis sin exponer, cifrado, respaldos);
+  - **validación del SLEP** antes de subir datos reales.
+
+**3. PaaS externo**
+
+- Si se usa un PaaS o servicios administrados con servidores fuera de Chile (Render, Railway, MongoDB Atlas u otros), **sí hay transferencia internacional** de datos personales, además de datos de menores y sensibles.
 - En ese caso hay que:
   - identificar el país de destino y si ofrece un nivel de protección adecuado;
   - si no, contar con garantías adecuadas (p. ej. cláusulas contractuales con el proveedor);
   - documentar la transferencia;
   - **validarla con el SLEP antes de subir datos reales**.
-- **Ojo:** esto aplica aunque la aplicación corra en la escuela si los **respaldos** se guardan en una nube extranjera (Google Drive, S3, etc.).
+- Si el proveedor permite elegir la región, conviene la más cercana con protección adecuada y cifrado en reposo.
+
+**En todos los escenarios:** guardar los **respaldos** en una nube extranjera (Google Drive, S3, etc.) cuenta como transferencia internacional, aunque la aplicación corra en Chile.
 
 ---
 
@@ -653,12 +717,13 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 | `/alumnos/:id` | **Ficha del alumno** | Resumen y semáforo; asistencia en el tiempo; notas por asignatura (Lenguaje y Matemática destacadas); línea de tiempo de evaluaciones externas; alertas activas e historial; observaciones (según permisos) |
 | `/cargas` | Cargas | Subir archivo por fuente, vista previa, avance e informe de errores por fila, historial de cargas |
 | `/simce` | SIMCE | ⏳ Placeholder: resultados de la escuela por año, nivel y asignatura |
-| `/admin/usuarios` | Usuarios | Lista blanca: agregar o desactivar correos, asignar roles |
+| `/admin/usuarios` | Usuarios | Lista blanca: agregar o desactivar correos, asignar roles y, a los docentes, sus cursos |
 | `/admin/roles` | Roles y permisos | Matriz editable (solo Directora) |
 | `/admin/reglas` | Reglas de alerta | Edición de umbrales |
 | `/admin/auditoria` | Auditoría | Consulta del registro de accesos (solo Directora) |
 
 - El menú se arma según los permisos del usuario: lo que no puede usar no aparece.
+- Para un usuario con alcance `cursosAsignados`, el dashboard, los selectores de curso y las búsquedas muestran solo sus cursos.
 - Los colores del semáforo van acompañados de texto o ícono, para no depender solo del color (accesibilidad).
 
 ---
@@ -671,6 +736,7 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 
 - [ ] Formatos de exportación de **Mi Aula** (notas y asistencia): ¿notas parciales o solo promedios? ¿Asistencia diaria o mensual? ¿Cómo vienen PK y K?
 - [ ] Formatos de **Letrapps**, **DIA** y **SEPA**: columnas, escalas, categorías y en qué cursos y momentos se aplica cada uno.
+- [x] ¿Qué es la "prueba de velocidad lectora" de la propuesta? → Es **Letrapps**, con resultados por alumno.
 - [ ] Calendario de la escuela: ¿semestres o trimestres?
 
 **Reglas de alerta**
@@ -683,12 +749,14 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 
 - [ ] Dominio del correo institucional.
 - [ ] Validar la matriz de permisos por rol, especialmente el acceso a datos PIE y psicosociales.
+- [ ] **Docentes:** ¿los cursos se asignan como profesor jefe, por asignatura o ambos? ¿El docente puede ver el módulo SIMCE (`simce.ver`)?
 - [ ] Revisar el repositorio de **Datademy** para alinear el módulo de autenticación.
 
 **Infraestructura y legal**
 
-- [ ] Especificaciones del **servidor de la escuela**: sistema operativo, RAM, disco, si admite Docker, quién lo administra, política de respaldos.
-- [ ] Confirmación del **SLEP** sobre el hosting y el convenio de tratamiento de datos.
+- [ ] **Decisión de hosting:** servidor de la escuela, servidor nacional o PaaS externo (ver [sección 8.5](#85-escenarios-de-hosting)).
+- [ ] Si se usa el servidor de la escuela: sistema operativo, RAM, disco, si admite Docker, quién lo administra, política de respaldos.
+- [ ] Confirmación del **SLEP** sobre el hosting y el convenio de tratamiento de datos (y el contrato de encargo con el proveedor, si se usa uno).
 - [ ] Política de conservación de datos de alumnos egresados o retirados.
 
 **SIMCE**
@@ -700,8 +768,8 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 | Etapa | Contenido | Depende de |
 |-------|-----------|------------|
 | **0. Diseño** | Este documento; revisión con el equipo, el profesor y la escuela | — |
-| **1. Base** | Docker Compose, configuración, MongoDB, BullMQ, login con Google y lista blanca, roles y permisos, auditoría, cursos, asignaturas y alumnos con datos ficticios, estructura del frontend | Dominio institucional, repo Datademy |
+| **1. Base** | Docker Compose, configuración, MongoDB, BullMQ, login con Google y lista blanca, roles y permisos con alcance por curso, auditoría, cursos, asignaturas y alumnos con datos ficticios, estructura del frontend | Dominio institucional, repo Datademy |
 | **2. Mi Aula + alertas** | Cargas de notas y asistencia, motor de alertas (asistencia, rendimiento por área, tendencia), dashboard, vista de curso, ficha del alumno | Formatos de Mi Aula |
 | **3. Evaluaciones externas** | Parsers de Letrapps, DIA y SEPA, normalización, alertas externas, cruzadas y de discrepancia | Formatos de cada instrumento |
-| **4. Cierre** | Observaciones, módulo SIMCE, exportación de ficha (derechos de los titulares), endurecimiento de seguridad, despliegue en el servidor de la escuela, capacitación | Definición SIMCE, servidor |
-| **Futuro** | Notificaciones a apoderados, justificación de inasistencias, multi-escuela | Nuevos requerimientos |
+| **4. Cierre** | Observaciones, módulo SIMCE, exportación de ficha (derechos de los titulares), endurecimiento de seguridad, despliegue en el hosting elegido, capacitación | Definición SIMCE, decisión de hosting |
+| **Futuro** | Registro de asistencia en la plataforma, notificaciones a apoderados, justificación de inasistencias, multi-escuela | Nuevos requerimientos |
