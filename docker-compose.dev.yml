@@ -1,0 +1,15 @@
+# Override para desarrollo local: publica MongoDB y Redis SOLO en 127.0.0.1
+# para correr la API (npm run start:dev) y Vite (npm run dev) fuera de Docker.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mongo redis
+#
+# No usar en el servidor: ahí MongoDB y Redis no deben tener puertos publicados.
+
+services:
+  mongo:
+    ports:
+      - '127.0.0.1:27017:27017'
+
+  redis:
+    ports:
+      - '127.0.0.1:6379:6379'

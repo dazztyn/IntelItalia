@@ -10,26 +10,32 @@ Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramien
 
 1. Las implementaciones se planifican en **modo plan**. Se presenta el plan y se espera su aprobación.
 2. Aprobado el plan, Claude modifica los archivos en la rama activa o, si el cambio lo necesita, **crea una rama nueva** para implementarlo (ver más abajo), y verifica los cambios (lint, build, tests).
-3. Al terminar, Claude entrega un **resumen de los archivos modificados** y un **mensaje de commit sugerido** para que el equipo lo copie.
-4. **El equipo revisa los cambios y hace el commit y el push a mano.**
+3. Al terminar, Claude entrega un **resumen de los archivos modificados** y un **mensaje de commit sugerido**.
+4. **Commit y push:**
+   - En las **ramas de tareas de Jira** (`PGT-…`), Claude puede hacer commit y push **solo a la rama de la tarea**, salvo que el equipo pida hacerlo a mano en esa tarea.
+   - En cualquier otro caso, el equipo hace el commit y el push.
+   - El equipo revisa y mergea siempre en el pull request.
 
 **Ramas:**
 
 - Claude **puede crear ramas** cuando un cambio lo necesita, p. ej. para separar una implementación del resto del trabajo.
-- La rama nueva parte de la rama base actualizada (`master`, salvo que se indique otra) y lleva un nombre descriptivo en español, en minúsculas y con guiones: `rol-docente`, `carga-mi-aula`.
+- La rama nueva parte de la rama base actualizada (`master`, salvo que se indique otra).
+- **Tareas de Jira:** la rama empieza con la clave del issue en mayúsculas, seguida de una descripción en español, en minúsculas y con guiones. Ejemplo: `PGT-42-infraestructura-base`. Así Jira la enlaza sola.
+- **Otros cambios:** nombre descriptivo en minúsculas y con guiones, p. ej. `ajustes-documentacion`.
 - Al crearla, Claude avisa el nombre de la rama y desde cuál partió.
 
 **Claude no debe:**
 
 - **borrar ramas** ni cambiar de rama dejando cambios sin guardar;
-- **hacer `git commit`, `git push`, `git merge`, `git rebase` ni `git reset`**, ni abrir pull requests, salvo que se le pida explícitamente en ese momento;
+- **hacer commit o push a `master`** ni a ramas que no sean de su tarea;
+- **hacer `git merge`, `git rebase` ni `git reset`**, ni abrir pull requests, salvo que se le pida explícitamente en ese momento;
 - **reescribir historia** (`amend`, `rebase`, `push --force`), aun cuando se le pida hacer un commit.
 
 **Atribución:** se permite la atribución a Claude en los commits y PR (p. ej. `Co-Authored-By`). La autoría del proyecto queda registrada en el repositorio.
 
 **Convenciones:**
 
-- **Mensajes de commit en español**, en infinitivo y breves, siguiendo el historial: `Agregar documento de arquitectura y diseño`, `Corregir validación de RUT`.
+- **Mensajes de commit en español**, en infinitivo y breves, siguiendo el historial: `Agregar documento de arquitectura y diseño`, `Corregir validación de RUT`. En tareas de Jira, empiezan con la clave: `PGT-42 Agregar docker compose`.
 - **Nunca incluir en los cambios** archivos `.env`, credenciales ni archivos con **datos reales de alumnos** (Excel/CSV de Mi Aula, Letrapps, DIA, SEPA, etc.). Para pruebas se usan datos ficticios o anonimizados.
 
 ## Proyecto
@@ -77,19 +83,29 @@ Monorepo sin `package.json` raíz: cada carpeta se instala y ejecuta por separad
 | `frontend/` | React 19 + Vite + TypeScript |
 | `docs/` | Documentación del proyecto |
 
-Despliegue: Docker Compose. **El hosting está por definir** (servidor de la escuela, servidor nacional o PaaS externo; ver sección 8.5 del documento). No usar servicios propios de un proveedor: todo se configura por variables de entorno. MongoDB y Redis nunca quedan expuestos a internet.
+Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para desarrollo). **El hosting está por definir** (servidor de la escuela, servidor nacional o PaaS externo; ver sección 8.5 del documento). No usar servicios propios de un proveedor: todo se configura por variables de entorno. MongoDB y Redis nunca quedan expuestos a internet.
 
 ## Comandos
 
 ```bash
+# Configuración (una vez): copiar y completar las claves. .env nunca se sube.
+cp .env.example .env
+
+# Desarrollo: MongoDB y Redis en Docker (solo en 127.0.0.1); API y Vite en local
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mongo redis
+
+# Todo en Docker (como en el servidor): http://localhost:8080
+docker compose up -d --build
+
 # Backend
 cd backend
 npm install
-npm run start:dev     # servidor en modo watch
+npm run start:dev     # servidor en modo watch (http://localhost:3000/api/salud)
 npm run lint          # ESLint (con --fix)
+npm run lint:check    # ESLint sin corregir (el que corre el CI)
 npm run format        # Prettier
 npm test              # tests unitarios (Jest)
-npm run test:e2e      # tests e2e
+npm run test:e2e      # tests e2e (MongoDB en memoria; o MONGO_URI_E2E=… para usar uno existente)
 npm run build
 
 # Frontend
@@ -100,7 +116,7 @@ npm run lint
 npm run build         # tsc -b && vite build
 ```
 
-Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la carpeta modificada.
+Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la carpeta modificada. El CI (`.github/workflows/ci.yml`) corre lo mismo en cada pull request.
 
 ## Convenciones de código
 

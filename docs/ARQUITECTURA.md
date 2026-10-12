@@ -131,7 +131,21 @@ La **prioridad** son las áreas de **Lenguaje y Matemática**.
 - El diagrama muestra el escenario del servidor de la escuela, detrás de su proxy. HTTPS termina en el proxy o en el Nginx interno.
 - **Solo el proxy queda expuesto a la red.** MongoDB y Redis quedan en la red interna de Docker, con autenticación activada y sin puertos publicados.
 - **Portabilidad:** el mismo `docker-compose.yml` y la misma configuración sirven para los tres escenarios. Los servicios externos se conectan por variables de entorno (`MONGO_URI`, `REDIS_URL`, etc.), así que se puede usar una base de datos administrada sin cambiar el código. No se usan servicios propios de un proveedor.
-- La configuración va en variables de entorno (`.env`, nunca en el repositorio), validadas al iniciar con `@nestjs/config`.
+- La configuración va en variables de entorno (`.env`, nunca en el repositorio), validadas al iniciar con `@nestjs/config`. Si falta una variable obligatoria, la API no arranca.
+
+**Implementación (PGT-42):**
+
+| Archivo | Uso |
+|---------|-----|
+| `docker-compose.yml` | Despliegue completo. Solo `web` publica un puerto (`PUERTO_WEB`, por defecto 8080). Nginx sirve el frontend y reenvía `/api` a `api:3000` |
+| `docker-compose.dev.yml` | Override de desarrollo: publica MongoDB y Redis **solo en `127.0.0.1`** para correr la API y Vite en local. No se usa en el servidor |
+| `docker/mongo/crear-usuario-app.js` | Al crear la base, crea un usuario con `readWrite` solo sobre `intelitalia`. La API usa ese usuario, no el root (mínimo privilegio) |
+| `.env.example` | Plantilla de variables. Se copia a `.env`, que nunca se sube |
+| `.github/workflows/ci.yml` | En cada pull request: lint, build y tests del backend (unitarios y e2e con MongoDB en memoria) y lint y build del frontend |
+
+- **Variables de la API:** `NODE_ENV`, `PUERTO`, `MONGO_URI`, `REDIS_URL` y `ORIGEN_FRONTEND` (origen permitido por CORS, con credenciales para la cookie de sesión). Están validadas en `backend/src/configuracion/validacion.ts`.
+- **Salud:** `GET /api/salud` responde `{ estado, mongo, redis }`: 200 si todo está arriba y 503 si algo falla. Lo usan los healthchecks de Docker y del proxy. No expone datos personales ni detalles internos.
+- Todas las rutas de la API llevan el prefijo `/api`.
 
 ### Convención de nombres
 
