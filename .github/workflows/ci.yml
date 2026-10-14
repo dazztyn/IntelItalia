@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master]
+    # master y las ramas de tareas de Jira (PGT-…), para tener el resultado antes del PR.
+    branches: [master, 'PGT-*']
 
 permissions:
   contents: read

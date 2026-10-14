@@ -107,6 +107,7 @@ npm run format        # Prettier
 npm test              # tests unitarios (Jest)
 npm run test:e2e      # tests e2e (MongoDB en memoria; o MONGO_URI_E2E=… para usar uno existente)
 npm run build
+npm run semilla       # carga datos FICTICIOS (asignaturas, cursos PK–8° y alumnos) en el MONGO_URI de .env; nunca en producción
 
 # Frontend
 cd frontend
