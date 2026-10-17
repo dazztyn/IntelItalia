@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master]
+    # master y las ramas de tareas de Jira (PGT-…), para tener el resultado antes del PR.
+    branches: [master, 'PGT-*']
 
 permissions:
   contents: read
@@ -15,6 +16,9 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      # mongodb-memory-server descarga MongoDB aquí, la misma carpeta que guarda la caché.
+      MONGOMS_DOWNLOAD_DIR: /home/runner/.cache/mongodb-binaries
     defaults:
       run:
         working-directory: backend
@@ -28,7 +32,7 @@ jobs:
       - name: Caché del binario de MongoDB (tests e2e)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/mongodb-binaries
+          path: /home/runner/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
       - run: npm ci
       - run: npm run lint:check

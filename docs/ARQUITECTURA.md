@@ -170,8 +170,9 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   ipe: null,                  // Identificador Provisorio Escolar (alumnos extranjeros sin RUT)
   nombres: "Ana María",
   apellidoPaterno: "Pérez",
-  apellidoMaterno: "Soto",
-  fechaNacimiento: ISODate,
+  apellidoMaterno: "Soto",       // opcional (null si tiene un solo apellido)
+  nombreNormalizado: "ANA MARIA PEREZ SOTO",  // calculado: sin tildes, mayúsculas, palabras ordenadas
+  fechaNacimiento: ISODate,      // ⏳ solo si Mi Aula la exporta y se usa
   matriculas: [
     { anio: 2026, cursoId: ObjectId, estado: "activa" }   // activa | retirada | trasladada
   ],
@@ -182,8 +183,13 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 }
 ```
 
-- **Índices:** `rut` único (parcial, cuando no es `null`), `ipe` único (parcial), `matriculas.anio + matriculas.cursoId`.
+- **Índices:** `rut` único (parcial, cuando no es `null`), `ipe` único (parcial), `matriculas.anio + matriculas.cursoId`, `nombreNormalizado`.
 - El RUT se valida con el dígito verificador (módulo 11) antes de guardarse.
+- **Implementación (PGT-43):**
+  - todo alumno necesita RUT o IPE, y no puede tener dos matrículas **activas** el mismo año (una retirada y otra activa sí, para cambios de curso);
+  - `nombreNormalizado` no depende del orden de nombres y apellidos: "Pérez Soto Ana María" y "Ana María Pérez Soto" dan la misma clave. Sirve para identificar al alumno en fuentes sin RUT;
+  - `pie` tiene `select: false`: **no aparece en ninguna consulta** salvo que se pida explícitamente (`AlumnosService.obtenerDatosPie`), que solo se usará detrás del permiso `pie.ver`;
+  - todavía no hay endpoints HTTP: llegan con el login y los permisos (PGT-6, PGT-7), para no exponer datos de alumnos sin control de acceso.
 - **Minimización:** solo se guardan los campos que se usan. No se importan dirección, teléfono, datos del apoderado ni diagnósticos detallados, aunque vengan en el archivo.
 
 ### 3.2 `cursos`
@@ -225,6 +231,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 
 - El campo **`area`** permite que las alertas "solo Lenguaje" o "solo Matemática" funcionen aunque cada curso o archivo nombre la asignatura de otra forma.
 - Los **`aliases`** permiten reconocer la asignatura al cargar archivos con nombres distintos.
+- **Implementación (PGT-43):** el campo calculado `nombresNormalizados` (nombre y aliases sin tildes ni mayúsculas) permite buscar por cualquiera de ellos. Un alias puede repetirse entre niveles ("Lenguaje" en PK/K y en básica), así que al cargar se busca **dentro de las asignaturas del curso** (`curso.asignaturaIds`). El catálogo inicial está en `backend/src/asignaturas/catalogo.ts` (⏳ confirmar con la malla de la escuela y los nombres de Mi Aula, sobre todo PK y K).
 
 ### 3.4 `calificaciones`
 
