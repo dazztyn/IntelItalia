@@ -205,7 +205,11 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 - **Índice único compuesto** `{ anio, nivel, letra }`, con `letra: null` como valor válido.
 - Todo lo que depende del curso (`matriculas`, `calificaciones`, `asistencias`, filtros y dashboards) referencia siempre **`cursoId`**, nunca el nivel directamente. Los reportes "por nivel" se obtienen agrupando los cursos de ese nivel.
 - En el frontend, el selector muestra el `nombre` del curso. Mientras no haya letras se ve igual que hoy ("4° Básico").
-- Al cargar archivos, el curso se resuelve por nivel + letra. Si el archivo no trae letra y el nivel tiene un solo curso, se asigna a ese. Si hay más de uno, la fila se marca como **error que hay que resolver**.
+- **Resolución del curso al cargar archivos** (por año + nivel + letra):
+  - Si el nivel tiene **un solo curso**, la fila se asigna a ese curso, **traiga o no letra el archivo**. Esto importa porque los instrumentos externos escriben una letra aunque la escuela no la use: Letrapps pone "3° Básico A" y el DIA, "3 A".
+  - Si el nivel tiene **más de un curso**, la letra del archivo tiene que coincidir con la de un curso. Si el archivo no trae letra o la letra no existe, la fila se marca como **error que hay que resolver**.
+  - Cada parser traduce el formato de curso de su fuente ("3° Básico A", "3 A", "3°B") a nivel + letra.
+- **Cuando la escuela empiece a usar letras:** se crean los cursos del año nuevo con su letra (p. ej. 3° A y 3° B). Los cursos de años anteriores, con `letra: null`, no cambian, así que el historial se mantiene.
 
 ### 3.3 `asignaturas`
 
@@ -230,7 +234,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   alumnoId: ObjectId,
   cursoId: ObjectId,
   asignaturaId: ObjectId,
-  periodo: "2026-S1",         // semestre (o trimestre, según el calendario de la escuela)
+  periodo: "2026-S1",         // semestre: "2026-S1" | "2026-S2" (la escuela trabaja por semestres)
   numeroEvaluacion: 3,        // ⏳ pendiente de formato (¿Mi Aula exporta notas parciales o solo promedios?)
   tipo: "parcial",            // "parcial" | "promedioPeriodo" | "promedioFinal"
   nota: 5.4,                  // 1.0–7.0 (1° a 8° básico)
@@ -257,13 +261,43 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 }
 ```
 
-- ⏳ La granularidad (diaria o mensual) depende de la exportación de Mi Aula. Si viene por día, se guarda por día y el porcentaje se calcula en una agregación.
+- ⏳ La granularidad (diaria, mensual o semestral) depende de la exportación de Mi Aula. Si viene por día o por mes, se guarda así y el porcentaje se calcula en una agregación.
+- La escuela mide la asistencia **por semestre**: la alerta usa el porcentaje del semestre en curso (sección 5.2 a).
 
 ### 3.6 `tiposEvaluacion`
 
 Catálogo que describe **cómo se lee y cómo se normaliza** cada instrumento. Agregar una evaluación nueva, como una prueba propia de la escuela, es crear un documento aquí, no programar.
 
+Ejemplos con los campos reales de cada instrumento (ver [sección 4.4](#44-formatos-recibidos)):
+
 ```js
+// Letrapps: categorías ordenadas, comparadas con el estándar Mineduc del nivel
+{
+  _id: ObjectId,
+  codigo: "LETRAPPS",
+  nombre: "Letrapps — Dominio lector",
+  areas: ["lenguaje"],
+  niveles: ["1", "2", "3", "4", "5", "6", "7", "8"],   // ⏳ a confirmar
+  momentos: ["medicion1", "medicion2", "medicion3"],   // ⏳ cuántas mediciones hay al año
+  campos: [
+    { clave: "ppm", tipo: "numero", min: 0 },           // palabras por minuto
+    { clave: "velocidad", tipo: "categoria",
+      orden: ["noLector", "muyLenta", "lenta", "medioBaja", "medioAlta", "rapida", "muyRapida"] },
+    { clave: "calidad", tipo: "categoria",
+      orden: ["noLector", "silabica", "palabraAPalabra", "unidadesCortas", "fluida"] },
+    { clave: "textoLeido", tipo: "texto" }              // p. ej. "Cómo plantar un árbol"
+  ],
+  reglaNormalizacion: {
+    tipo: "estandarNivel",                              // distancia a la categoría estándar del nivel
+    campos: ["velocidad", "calidad"],
+    estandarPorNivel: { "3": { velocidad: "medioAlta", calidad: "unidadesCortas" } },  // ⏳ resto de niveles
+    // ⏳ por definir con la escuela; propuesta: en el estándar o sobre él → adecuado,
+    //    una categoría bajo él → medio, dos o más → bajo
+  },
+  activo: true
+}
+
+// DIA: solo porcentajes por eje (Lectura) o por OA (Matemática), sin nivel de logro
 {
   _id: ObjectId,
   codigo: "DIA",
@@ -271,17 +305,21 @@ Catálogo que describe **cómo se lee y cómo se normaliza** cada instrumento. A
   areas: ["lenguaje", "matematica"],
   niveles: ["2", "3", "4", "5", "6", "7", "8"],        // ⏳ a confirmar
   momentos: ["diagnostico", "monitoreo", "cierre"],
-  campos: [                                            // qué trae cada resultado
-    { clave: "porcentajeLogro", tipo: "numero", min: 0, max: 100 },
-    { clave: "nivelLogro", tipo: "categoria" }
+  campos: [
+    // lenguaje: { localizar, interpretarRelacionar, reflexionar }; matematica: { OA2, OA3, … }
+    { clave: "porcentajesPorEje", tipo: "mapaNumeros", min: 0, max: 100 },
+    { clave: "porcentajeLogro", tipo: "numero", min: 0, max: 100, calculado: "promedio de porcentajesPorEje" }
   ],
-  reglaNormalizacion: {                                // cómo llegar al nivel común
-    campo: "nivelLogro",
-    mapa: { /* ⏳ categoría original → "bajo" | "medio" | "adecuado" */ }
+  reglaNormalizacion: {
+    tipo: "rangos",
+    campo: "porcentajeLogro",
+    rangos: [ /* ⏳ cortes a definir por la escuela (Jefa Técnica) */ ]
   },
   activo: true
 }
 ```
+
+- **Tipos de normalización:** `mapa` (categoría → nivel), `rangos` (número → nivel) y `estandarNivel` (posición respecto de la categoría esperada para el nivel del alumno). Cada instrumento usa **su propio criterio**; el catálogo solo dice cómo traducirlo a la escala común.
 
 ### 3.7 `resultadosEvaluacion`
 
@@ -292,9 +330,10 @@ Catálogo que describe **cómo se lee y cómo se normaliza** cada instrumento. A
   tipoEvaluacionId: ObjectId,
   cursoId: ObjectId,
   anio: 2026,
-  momento: "diagnostico",
+  momento: "diagnostico",     // DIA: diagnostico | monitoreo | cierre; Letrapps: medicion1, medicion2…
   area: "lenguaje",
-  resultados: { porcentajeLogro: 42, nivelLogro: "…" },  // forma libre, según tiposEvaluacion.campos
+  resultados: { porcentajesPorEje: { localizar: 55, interpretarRelacionar: 70, reflexionar: 20 }, porcentajeLogro: 48.3 },
+                                                          // forma libre, según tiposEvaluacion.campos
   nivelNormalizado: "bajo",                               // "bajo" | "medio" | "adecuado"
   fechaAplicacion: ISODate,
   cargaId: ObjectId
@@ -347,7 +386,14 @@ Resultados **agregados de la escuela**, sin datos por alumno.
   activa: true,
   parametros: {
     umbralAlto: 4.0,                 // promedio < 4.0 → alta
-    umbralPreventivo: 4.5,           // 4.0 ≤ promedio < 4.5 → media
+    umbralPreventivo: 4.5,           // 4.0 ≤ promedio < 4.5 → media (⏳ ¿5.0?)
+    escalaNotas: [                   // categoría que se muestra en la ficha
+      { desde: 6.0, categoria: "destacado" },
+      { desde: 5.0, categoria: "bueno" },
+      { desde: 4.0, categoria: "suficiente" },
+      { desde: 1.0, categoria: "insuficiente" }
+    ],
+    decimalesPromedio: 1,            // ⏳ confirmar regla de redondeo de la escuela
     areasPrioritarias: ["lenguaje", "matematica"],
     general: {
       severidadMaximaSinArea: "media" // tope si Lenguaje y Matemática no tienen alerta
@@ -410,13 +456,13 @@ Resultados **agregados de la escuela**, sin datos por alumno.
 
 | Instrumento | Nivel de detalle | Áreas | Cursos | Momentos | Estado |
 |-------------|-----------------|-------|--------|----------|--------|
-| **Letrapps** | Por alumno | Lenguaje: es la **prueba de velocidad lectora** de la escuela (⏳ métricas a confirmar con el formato, p. ej. palabras por minuto y comprensión) | ⏳ a confirmar | ⏳ varias mediciones al año | **MVP** |
-| **DIA** (Agencia de Calidad) | Por alumno | Lectura y Matemática (el área socioemocional queda fuera de alcance) | ⏳ a confirmar | Diagnóstico, monitoreo intermedio, cierre | **MVP** |
-| **SEPA** | Por alumno | Lenguaje y Matemática | 2° básico | ⏳ a confirmar | **MVP** |
+| **Letrapps** | Por alumno | Lenguaje: es la **prueba de velocidad lectora** de la escuela (dominio lector: PPM, velocidad y calidad) | ⏳ a confirmar (hay muestra de 3°) | Mediciones numeradas (N° 1, N° 2…) | **MVP** |
+| **DIA** (Agencia de Calidad) | Por alumno | Lectura y Matemática (el área socioemocional queda fuera de alcance) | ⏳ a confirmar (hay muestra de 3°) | Diagnóstico, monitoreo intermedio, cierre | **MVP** |
+| **SEPA** (MIDE UC) | Por alumno | Lenguaje y Matemática | 2° básico | ⏳ a confirmar | **MVP** (⏳ formato de carga por definir) |
 | **SIMCE** | Agregado de escuela | Lectura, Matemática (y otras según el año) | 4° todos los años; 6° y 8° se alternan | Anual | Módulo aparte, por definir |
 | **Evaluaciones propias** | Por alumno | Configurable | Configurable | Configurable | Soportado por el catálogo |
 
-Todos los detalles marcados con ⏳ se confirman con los archivos reales.
+Todos los detalles marcados con ⏳ se confirman con los archivos reales. El formato de cada instrumento está en la [sección 4.4](#44-formatos-recibidos).
 
 ### 4.2 Calendario del SIMCE
 
@@ -440,9 +486,63 @@ Cada instrumento usa su propia escala: porcentaje de logro, categorías, palabra
 | `medio` | Cerca de lo esperado; requiere monitoreo |
 | `adecuado` | Logra lo esperado |
 
-- La traducción la define `tiposEvaluacion.reglaNormalizacion`, ya sea un mapa de categorías o rangos numéricos.
+- La traducción la define `tiposEvaluacion.reglaNormalizacion`: un mapa de categorías, rangos numéricos o la comparación con el estándar del nivel.
 - **Se guardan siempre ambos valores**: el resultado original (`resultados`) y el normalizado. La ficha muestra el dato original y las alertas usan el normalizado.
-- ⏳ Las tablas de traducción de Letrapps, DIA y SEPA se definen al revisar sus formatos, idealmente usando las categorías que ya entrega cada instrumento.
+- Cada instrumento tiene **su propio criterio de medición**, y la traducción lo respeta:
+
+| Instrumento | Criterio propio | Traducción propuesta |
+|-------------|-----------------|----------------------|
+| **Letrapps** | Categorías de velocidad y calidad, y un **estándar Mineduc** por nivel (en 3°: velocidad *Medio alta*, calidad *Unidades Cortas*) | `estandarNivel`: en el estándar o sobre él → `adecuado`; una categoría bajo él → `medio`; dos o más → `bajo`. ⏳ Confirmar con la escuela y obtener el estándar de cada nivel. ⏳ Definir si manda la velocidad, la calidad o la peor de las dos |
+| **DIA** | Solo porcentajes por eje u OA, sin nivel de logro por alumno | `rangos` sobre el promedio de los porcentajes. ⏳ Cortes a definir por la escuela |
+| **SEPA** | Porcentajes por eje, porcentaje del área y puntaje | ⏳ A definir cuando se tenga el formato de carga |
+
+### 4.4 Formatos recibidos
+
+Muestras anonimizadas que entregó la escuela (octubre 2026). Las muestras **no se guardan en el repositorio**; aquí solo se describe su estructura.
+
+> **Ninguna fuente externa trae el RUT.** Todas identifican al alumno por nombre y n° de lista dentro del curso. Por eso la carga busca a cada alumno por curso y nombre (ver [sección 6.2](#62-reglas-de-la-carga)).
+
+#### Letrapps (dominio lector)
+
+- **Formato actual:** informe PDF por curso y medición ("Informe por curso · Gráfico de Barras · Dominio Lector"). El PDF tiene una capa de texto, así que se puede leer. ⏳ Consultar si Letrapps permite exportar a `.xlsx`; si lo permite, se prefiere ese formato.
+- **Encabezado:** escuela, curso ("3° Básico A"), **medición** ("Medición N° 1"), **texto leído** ("Lectura: Cómo plantar un árbol") y avance ("Resultados 22 de 22 estudiantes · 100% de avance").
+- **Tabla, una fila por alumno:**
+
+| Columna | Ejemplo | Campo interno |
+|---------|---------|---------------|
+| `#` | 1 | n° de lista (solo de apoyo) |
+| Nombre del Estudiante | APELLIDOS NOMBRES, en mayúsculas | se usa para identificar al alumno; no se guarda como dato del resultado |
+| PPM | "66 ppm" | `ppm` (número; se quita " ppm") |
+| Velocidad | "Lenta" | `velocidad` |
+| Calidad | "Palabra a Palabra" | `calidad` |
+
+- **Categorías de velocidad**, de menor a mayor: No Lector, Muy lenta, Lenta, Medio baja, Medio alta, Rápida, Muy rápida.
+- **Categorías de calidad**, de menor a mayor: No Lector (NL), Silábica (SL), Palabra a Palabra (PP), Unidades Cortas (UC), Fluida (FL).
+- **Estándar Mineduc:** los gráficos del informe muestran la categoría esperada para el nivel. En 3° básico es velocidad *Medio alta* y calidad *Unidades Cortas*. ⏳ Falta el estándar de los otros niveles.
+- **Ojo:** una tabla larga puede seguir en la página siguiente, así que el parser debe leer todas las páginas antes de los gráficos.
+
+#### DIA (Agencia de Calidad)
+
+- **Formato:** `.xlsx`, un archivo por curso y área, con una sola hoja.
+- **Encabezado:** fila 5 "Establecimiento", fila 6 "Curso" ("3 A"), fila 7 "Fecha de descarga de este reporte" ("23/04/2026 17:09:32").
+- **Tabla:** encabezados en la fila 13 y datos desde la fila 14. La fila 12 es un título combinado sobre las columnas de resultados.
+  - Columnas fijas: "Número de Lista" y "Nombre del Estudiante".
+  - **Lectura:** título "EJES DE HABILIDAD" y columnas Localizar, Interpretar y relacionar, Reflexionar.
+  - **Matemática:** título "Porcentaje de respuestas de cada estudiante según aprendizajes previos que son clave para abordar los OA basales del nivel actual" y una columna por OA (OA2, OA3, OA5…; en 3° son 12). Los OA cambian según el nivel.
+- **Valores:** porcentajes guardados **como texto con coma decimal** ("73,08"). Se convierten a número.
+- **No viene en el archivo:** el momento (diagnóstico, monitoreo o cierre), el año y un nivel de logro. El momento lo elige el usuario al subir el archivo. El área se reconoce por el título de la fila 12, y el usuario la confirma en la vista previa.
+- Faltan algunos n° de lista (alumnos que no rindieron), así que **no** se puede suponer una lista correlativa.
+
+#### SEPA (MIDE UC)
+
+- **Formato actual:** solo informes PDF, con una tabla por alumno y un gráfico de distribución. La muestra recibida es una **imagen**, sin texto que se pueda leer.
+- **Contenido (Lenguaje):** porcentaje por eje (exp: información explícita, imp: información implícita, sgl: sentido global, sce: situación comunicativa y elementos estructurales), "Porcentaje Lenguaje" y "Puntaje Lenguaje". Además trae filas de "Promedio del curso" y "Promedio sin NEEP", y una escala de colores de 0% a 100%.
+- **Marcas del informe:** NEEP (necesidad educativa especial permanente), "A" (ausente o sin respuestas válidas) y (\*) (RUT erróneo). La marca NEEP es un **dato sensible PIE y no se importa** (minimización). "A" se registra como "sin resultado".
+- ⏳ **Pendiente:** consultar si la plataforma SEPA permite descargar en Excel, y conseguir el informe de Matemática. Mientras tanto no se implementa el parser. Si no hay Excel, la alternativa es ingresar los datos a mano.
+
+#### SIMCE
+
+- Fuera del foco del MVP (módulo aparte). Al ser pocos datos agregados al año, se propone ingresarlos a mano.
 
 ---
 
@@ -468,12 +568,23 @@ Criterios entregados por la escuela:
 | < 50% | **Crítica** | crítica | 🔴 rojo |
 
 - Los rangos se escriben como **intervalos continuos**: se usa `< 90%` en vez de "hasta 89%" y `< 85%` en vez de "hasta 84%". Así ningún porcentaje con decimales queda sin categoría (p. ej. 89,5% o 84,7%).
-- ⚠️ **Por confirmar con la escuela:** los criterios originales no incluyen el valor **exacto 50%** en ninguna categoría. Por ahora queda en "Grave".
-- ⏳ Por definir: si el porcentaje se calcula **acumulado del año** (propuesta por defecto), por mes o por semestre.
+- **Exactamente 50%** cuenta como "Grave" (confirmado por la escuela).
+- **El porcentaje se calcula por semestre** (confirmado). La categoría del alumno es la del semestre en curso. Los semestres anteriores quedan en el historial de la ficha.
 
 #### b) Rendimiento por área (notas)
 
-Se importan las notas de **todas** las asignaturas. Con ellas se calculan tres promedios por alumno: **Lenguaje** (asignaturas con `area: "lenguaje"`), **Matemática** (`area: "matematica"`) y **general** (todas). Las asignaturas con `area: "otra"` no generan alertas propias; solo cuentan en el promedio general.
+**Escala de notas de la escuela.** Se muestra en la ficha junto a cada promedio. Los rangos y nombres se configuran en `reglasAlerta`:
+
+| Rango | Categoría | Nota |
+|-------|-----------|------|
+| 6.0 – 7.0 | **Destacado** | Criterio de la escuela |
+| 5.0 – 5.9 | **Bueno** | La escuela lo llama "suficiente"; en Chile se suele llamar "bueno". ⏳ Confirmar el nombre |
+| 4.0 – 4.9 | **Suficiente** | La escuela no le da nombre; en Chile se suele llamar "suficiente". ⏳ Confirmar el nombre |
+| 1.0 – 3.9 | **Insuficiente** | Criterio de la escuela |
+
+- ⏳ **Redondeo:** confirmar si los promedios se redondean a un decimal como es habitual (p. ej. 3,95 → 4,0). El cálculo usa la misma regla que la escuela, para no generar discrepancias con Mi Aula.
+
+**Alertas.** Se importan las notas de **todas** las asignaturas. Con ellas se calculan tres promedios por alumno: **Lenguaje** (asignaturas con `area: "lenguaje"`), **Matemática** (`area: "matematica"`) y **general** (todas). Las asignaturas con `area: "otra"` no generan alertas propias; solo cuentan en el promedio general.
 
 **Lenguaje y Matemática** son la prioridad:
 
@@ -494,6 +605,7 @@ Se importan las notas de **todas** las asignaturas. Con ellas se calculan tres p
 - **"Solo en Lenguaje" / "Solo en Matemática":** si hay alerta en un área y no en la otra, el resumen del alumno lo dice explícitamente (p. ej. *"Rendimiento bajo solo en Lenguaje"*).
 - **Solo el promedio general bajo:** el resumen lo aclara, p. ej. *"Promedio general bajo (Lenguaje y Matemática dentro de lo esperado)"*.
 - Los umbrales (4.0 / 4.5) y el tope se configuran en `reglasAlerta` (ver [sección 3.9](#39-colecciones-de-alertas)).
+- ⏳ **Umbral preventivo:** está en 4.5. Falta decidir con la escuela si se amplía a todo el rango "Suficiente" (4.0 – 4.9), es decir, `umbralPreventivo: 5.0`. Es un cambio de configuración, no de código.
 - **PK y K:** no tienen notas numéricas, así que la regla usa los conceptos (p. ej. mayoría de "Por lograr"). ⏳ Se define al ver el formato de Mi Aula para estos niveles.
 
 #### c) Evaluaciones externas
@@ -510,8 +622,8 @@ Se importan las notas de **todas** las asignaturas. Con ellas se calculan tres p
 
 #### e) Tendencia
 
-- Baja del promedio de un área **≥ 0,5 puntos** entre períodos consecutivos → severidad media.
-- Baja de la asistencia de una categoría a otra peor entre meses → informativa.
+- Baja del promedio de un área **≥ 0,5 puntos** entre semestres consecutivos → severidad media.
+- Baja de la asistencia de una categoría a otra peor entre semestres → informativa. Si Mi Aula entrega el detalle mensual, también se puede comparar mes a mes dentro del semestre.
 
 ### 5.3 Semáforo del alumno
 
@@ -558,10 +670,17 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
 
 ### 6.2 Reglas de la carga
 
-- **Un parser por fuente:** Mi Aula notas, Mi Aula asistencia, Letrapps, DIA, SEPA y SIMCE. ⏳ Todos pendientes de formato.
+- **Un parser por fuente:** Mi Aula notas, Mi Aula asistencia, Letrapps, DIA y SEPA. Letrapps y DIA ya tienen formato conocido (sección 4.4). ⏳ Mi Aula y SEPA siguen pendientes de formato. El SIMCE se ingresa a mano.
 - **Vista previa:** antes de confirmar, el usuario puede validar el archivo y ver cuántas filas se cargarían y qué errores hay, sin guardar nada.
 - **Validación del RUT:** se normaliza (quita puntos, espacios y pasa el DV a mayúscula) y se valida el dígito verificador. Un RUT inválido es error de fila, no de todo el archivo.
-- **Alumnos:** un alumno que no existe se crea desde la carga de Mi Aula, que es la fuente oficial de matrícula. Las cargas de evaluaciones externas **no** crean alumnos; si no se encuentra el RUT, la fila se marca como error.
+- **Alumnos:** un alumno que no existe se crea desde la carga de Mi Aula, que es la fuente oficial de matrícula y la única que se espera que traiga el RUT (⏳ formato pendiente). Las cargas de evaluaciones externas **no** crean alumnos.
+- **Identificación en evaluaciones externas** (Letrapps, DIA, SEPA), que no traen RUT (sección 4.4). El alumno se busca entre los **matriculados en el curso** del archivo, en este orden:
+  1. por RUT, si el archivo lo trae;
+  2. por **nombre normalizado**: sin tildes ni signos, en mayúsculas, con espacios simples y sin importar el orden de nombres y apellidos;
+  3. el **n° de lista** solo sirve para desempatar. Nunca identifica por sí solo, porque cambia cuando entran o se retiran alumnos.
+  
+  Si no hay coincidencia o hay más de un candidato, la fila aparece en la **vista previa** para que el usuario elija al alumno o la descarte. Lo que el usuario elige se guarda como un alias del nombre en esa fuente, para no volver a preguntarlo en las cargas siguientes. El nombre que trae el archivo se usa solo para identificar al alumno y no se guarda en el resultado.
+- **Valores especiales:** la marca de ausente (p. ej. "A" en SEPA, o un alumno que no aparece en el archivo) se registra como "sin resultado", nunca como 0%. En Letrapps, "No Lector" con 0 ppm **sí** es un resultado.
 - **Alcance por curso:** si quien sube el archivo tiene un rol con `alcance: "cursosAsignados"` (p. ej. `docente`), las filas de cursos que no tiene asignados se marcan como **error de fila** y no se cargan. Esto incluye la creación de alumnos desde Mi Aula.
 - **Idempotencia:** se usan upserts sobre las claves únicas (sección 3). Cargar dos veces el mismo archivo no duplica datos.
 - **Minimización:** solo se leen las columnas mapeadas y el resto se descarta. El archivo original se elimina después de procesarlo.
@@ -776,16 +895,24 @@ Como el hosting todavía no está definido, el cumplimiento se apoya sobre todo 
 
 **Datos y formatos**
 
-- [ ] Formatos de exportación de **Mi Aula** (notas y asistencia): ¿notas parciales o solo promedios? ¿Asistencia diaria o mensual? ¿Cómo vienen PK y K?
-- [ ] Formatos de **Letrapps**, **DIA** y **SEPA**: columnas, escalas, categorías y en qué cursos y momentos se aplica cada uno.
+- [ ] Formatos de exportación de **Mi Aula** (notas, asistencia y, si existe, nómina de alumnos): ¿trae RUT? ¿Notas parciales o solo promedios? ¿Asistencia diaria, mensual o semestral? ¿Cómo vienen PK y K?
+- [x] Formatos de **Letrapps** y **DIA**: recibidos y descritos en la sección 4.4.
+- [ ] ¿**Letrapps** permite exportar a `.xlsx`? Si no, se lee el PDF.
+- [ ] ¿La plataforma **SEPA** permite descargar en Excel? Falta además el informe de Matemática.
+- [ ] En qué cursos y momentos se aplica cada instrumento, y cuántas mediciones de Letrapps hay al año.
 - [x] ¿Qué es la "prueba de velocidad lectora" de la propuesta? → Es **Letrapps**, con resultados por alumno.
-- [ ] Calendario de la escuela: ¿semestres o trimestres?
+- [x] Calendario de la escuela → **semestres**.
+- [x] Letra del curso → hoy hay un curso por nivel y la letra que traen los instrumentos ("3 A") es solo de formato. A futuro podría haber letras (3° A y 3° B); el modelo ya lo soporta (sección 3.2).
 
 **Reglas de alerta**
 
-- [ ] **Asistencia exactamente 50%:** ¿"Grave" o "Crítica"?
-- [ ] ¿La asistencia se evalúa **acumulada del año**, por mes o por semestre?
-- [ ] Validar los umbrales de rendimiento (4.0 / 4.5) y la regla de tendencia.
+- [x] **Asistencia exactamente 50%** → "Grave".
+- [x] ¿Cómo se mide la asistencia? → **Por semestre**.
+- [x] Escala de notas de la escuela → recibida (sección 5.2 b).
+- [ ] Nombres de las categorías 5.0–5.9 y 4.0–4.9 ("Bueno" y "Suficiente").
+- [ ] **Umbral preventivo:** ¿4.5 o todo el rango 4.0–4.9? Y validar la regla de tendencia.
+- [ ] **Redondeo** de los promedios (¿3,95 → 4,0?).
+- [ ] **Normalización:** estándar Mineduc de Letrapps para cada nivel (y si manda la velocidad, la calidad o la peor de las dos), y cortes de porcentaje para el DIA y SEPA.
 
 **Usuarios y acceso**
 
@@ -812,6 +939,6 @@ Como el hosting todavía no está definido, el cumplimiento se apoya sobre todo 
 | **0. Diseño** | Este documento; revisión con el equipo, el profesor y la escuela | — |
 | **1. Base** | Docker Compose, configuración, MongoDB, BullMQ, login con Google y lista blanca, roles y permisos con alcance por curso, auditoría, cursos, asignaturas y alumnos con datos ficticios, estructura del frontend | Dominio institucional, repo Datademy |
 | **2. Mi Aula + alertas** | Cargas de notas y asistencia, motor de alertas (asistencia, rendimiento por área, tendencia), dashboard, vista de curso, ficha del alumno | Formatos de Mi Aula |
-| **3. Evaluaciones externas** | Parsers de Letrapps, DIA y SEPA, normalización, alertas externas, cruzadas y de discrepancia | Formatos de cada instrumento |
+| **3. Evaluaciones externas** | Parsers de Letrapps, DIA y SEPA, identificación por nombre con resolución en la vista previa, normalización, alertas externas, cruzadas y de discrepancia | Nómina de Mi Aula, criterios de normalización, formato de carga de SEPA |
 | **4. Cierre** | Observaciones, módulo SIMCE, exportación de ficha (derechos de los titulares), endurecimiento de seguridad, despliegue en el hosting elegido, capacitación | Definición SIMCE, decisión de hosting |
 | **Futuro** | Registro de asistencia en la plataforma, notificaciones a apoderados, justificación de inasistencias, multi-escuela | Nuevos requerimientos |

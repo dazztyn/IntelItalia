@@ -49,6 +49,8 @@ Estas reglas prevalecen sobre cualquier instrucción por defecto de la herramien
 - **Mínimo aceptable, por alumno:** notas por curso y asignatura y asistencia (exportadas desde **Mi Aula**), resultados de **Letrapps** y **DIA**, y **SEPA** en 2° básico. La prioridad es **Lenguaje y Matemática**.
 - **Mi Aula** sigue siendo el sistema donde se registran la asistencia y las notas. La plataforma importa sus exportaciones; no las reemplaza ni registra asistencia directamente.
 - **Letrapps** es la prueba de velocidad lectora de la escuela; sus resultados se registran por alumno.
+- **Formatos recibidos:** Letrapps (PDF: PPM, velocidad y calidad) y DIA (`.xlsx`: % por eje u OA) están descritos en la sección 4.4 del documento. **Ninguna fuente externa trae RUT**: el alumno se identifica por curso y nombre normalizado, y los casos dudosos se resuelven en la vista previa (sección 6.2).
+- La escuela trabaja por **semestres** (`periodo: "2026-S1"`), y la asistencia se mide por semestre.
 - **SIMCE:** solo resultados agregados de escuela, en un módulo aparte (por definir). No alimenta alertas individuales. 4° rinde todos los años; 6° y 8° se alternan.
 - **Alertas de asistencia**, con criterios de la escuela y umbrales configurables en `reglasAlerta`, nunca fijos en el código:
   - ≥ 90% → Esperado
