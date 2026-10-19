@@ -1,0 +1,7 @@
+{
+  // TypeScript del backend (5.9), el mismo que usan el build y el CI.
+  // El que trae VS Code (6.x) activa `strict` por defecto y marca errores falsos.
+  "typescript.tsdk": "backend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "js/ts.tsdk.path": "backend/node_modules/typescript/lib"
+}
