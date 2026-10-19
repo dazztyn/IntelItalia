@@ -2,8 +2,8 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isObjectIdOrHexString, Model, Types } from 'mongoose';
 import { Alcance, Permiso, ROLES_INICIALES } from './permisos';
-import { Rol } from './rol.schema';
-import { Usuario, UsuarioDocument } from './usuario.schema';
+import { Rol } from './schemas/rol.schema';
+import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
 
 export interface DatosUsuario {
   correo: string;

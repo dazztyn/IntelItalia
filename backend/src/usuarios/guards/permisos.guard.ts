@@ -6,13 +6,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Permiso } from './permisos';
+import type { Permiso } from '../permisos';
 import {
   CLAVE_PERMISOS,
   CLAVE_PUBLICA,
   SolicitudAutorizada,
-} from './requiere-permisos.decorator';
-import { UsuariosService } from './usuarios.service';
+} from '../requiere-permisos.decorator';
+import { UsuariosService } from '../usuarios.service';
 
 // Guard global (docs/ARQUITECTURA.md, sección 7.3): revisa *qué* acción se puede
 // hacer. *Sobre qué datos* lo filtran los servicios con el alcance (alcance.ts).

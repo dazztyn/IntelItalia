@@ -3,7 +3,7 @@ import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import { Connection, Model, Types } from 'mongoose';
 import { NucleoModule } from './../src/nucleo.module';
-import { Rol } from './../src/usuarios/rol.schema';
+import { Rol } from '../src/usuarios/schemas/rol.schema';
 import { UsuariosModule } from './../src/usuarios/usuarios.module';
 import { UsuariosService } from './../src/usuarios/usuarios.service';
 
