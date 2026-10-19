@@ -768,8 +768,8 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 | Archivo | Uso |
 |---------|-----|
 | `backend/src/usuarios/permisos.ts` | Catálogo `PERMISOS` (la tabla de arriba) y `ROLES_INICIALES` |
-| `backend/src/usuarios/permisos.guard.ts` | Guard global (`APP_GUARD`) |
-| `backend/src/usuarios/requiere-permisos.decorator.ts` | `@RequierePermisos(...)`, `@Publica()` y `@UsuarioActual()` |
+| `backend/src/usuarios/guards/permisos.guard.ts` | Guard global (`APP_GUARD`) |
+| `backend/src/usuarios/decorators/requiere-permisos.decorator.ts` | `@RequierePermisos(...)`, `@Publica()` y `@UsuarioActual()` |
 | `backend/src/usuarios/alcance.ts` | Filtro por curso para los servicios (sección 7.4) |
 
 - **Sesión:** el guard lee `request.sesion = { usuarioId }`, que llena el login (PGT-6) a partir del JWT. En cada request carga de la base el usuario y su rol, así que desactivar a alguien o cambiar sus permisos tiene efecto inmediato.

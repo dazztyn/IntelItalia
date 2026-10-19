@@ -10,8 +10,8 @@ import {
   Publica,
   RequierePermisos,
   SolicitudAutorizada,
-} from './requiere-permisos.decorator';
-import { UsuarioAutorizado, UsuariosService } from './usuarios.service';
+} from '../decorators/requiere-permisos.decorator';
+import { UsuarioAutorizado, UsuariosService } from '../usuarios.service';
 
 class ControladorDePrueba {
   @Publica()

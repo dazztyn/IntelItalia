@@ -4,8 +4,8 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import type { Permiso } from './permisos';
-import type { UsuarioAutorizado } from './usuarios.service';
+import type { Permiso } from '../permisos';
+import type { UsuarioAutorizado } from '../usuarios.service';
 
 export const CLAVE_PERMISOS = 'permisosRequeridos';
 export const CLAVE_PUBLICA = 'rutaPublica';

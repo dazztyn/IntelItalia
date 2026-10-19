@@ -11,7 +11,7 @@ import {
   CLAVE_PERMISOS,
   CLAVE_PUBLICA,
   SolicitudAutorizada,
-} from '../requiere-permisos.decorator';
+} from '../decorators/requiere-permisos.decorator';
 import { UsuariosService } from '../usuarios.service';
 
 // Guard global (docs/ARQUITECTURA.md, sección 7.3): revisa *qué* acción se puede
