@@ -3,7 +3,8 @@ import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import { Connection, Model, Types } from 'mongoose';
 import { NucleoModule } from './../src/nucleo.module';
-import { Rol } from '../src/usuarios/schemas/rol.schema';
+import { PERMISOS } from './../src/usuarios/permisos';
+import { Rol } from './../src/usuarios/schemas/rol.schema';
 import { UsuariosModule } from './../src/usuarios/usuarios.module';
 import { UsuariosService } from './../src/usuarios/usuarios.service';
 
@@ -42,6 +43,16 @@ describe('Usuarios y roles (e2e)', () => {
     });
   });
 
+  it('al iniciar crea el rol directora con todos los permisos', async () => {
+    const directora = await roles
+      .findOne({ codigo: 'directora' })
+      .lean()
+      .exec();
+
+    expect(directora?.alcance).toBe('escuela');
+    expect(directora?.permisos).toEqual([...PERMISOS]);
+  });
+
   describe('con la base limpia', () => {
     beforeAll(async () => {
       const conexion = app.get<Connection>(getConnectionToken());
@@ -52,9 +63,9 @@ describe('Usuarios y roles (e2e)', () => {
     });
 
     it('crea los roles que faltan y no los duplica', async () => {
-      expect(await usuarios.asegurarRolesIniciales()).toBe(1);
+      expect(await usuarios.asegurarRolesIniciales()).toBe(2);
       expect(await usuarios.asegurarRolesIniciales()).toBe(0);
-      expect(await roles.countDocuments({ codigo: 'docente' })).toBe(1);
+      expect(await roles.countDocuments()).toBe(2);
     });
 
     it('no pisa los permisos que se editaron después', async () => {
@@ -67,6 +78,35 @@ describe('Usuarios y roles (e2e)', () => {
 
       const docente = await roles.findOne({ codigo: 'docente' }).exec();
       expect(docente?.permisos).not.toContain('alertas.ver');
+    });
+
+    it('la directora recupera los permisos que se le quitaron', async () => {
+      await roles.updateOne(
+        { codigo: 'directora' },
+        { $pull: { permisos: { $in: ['usuarios.gestionar', 'pie.ver'] } } },
+      );
+
+      await usuarios.asegurarRolesIniciales();
+
+      const directora = await roles.findOne({ codigo: 'directora' }).exec();
+      expect([...(directora?.permisos ?? [])].sort()).toEqual(
+        [...PERMISOS].sort(),
+      );
+    });
+
+    it('entrega los permisos y el alcance de la directora', async () => {
+      const usuario = await usuarios.crear({
+        correo: 'directora.ficticia@ejemplo.cl',
+        nombre: 'Directora Ficticia',
+        rol: 'directora',
+      });
+
+      const autorizada = await usuarios.obtenerUsuarioAutorizado(
+        String(usuario._id),
+      );
+
+      expect(autorizada?.alcance).toBe('escuela');
+      expect(autorizada?.permisos).toHaveLength(PERMISOS.length);
     });
 
     it('entrega los permisos y cursos de un docente activo', async () => {

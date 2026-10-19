@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isObjectIdOrHexString, Model, Types } from 'mongoose';
-import { Alcance, Permiso, ROLES_INICIALES } from './permisos';
+import { Alcance, Permiso, PERMISOS, ROLES_INICIALES } from './permisos';
 import { Rol } from './schemas/rol.schema';
 import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
 
@@ -36,7 +36,9 @@ export class UsuariosService implements OnModuleInit {
 
   /**
    * Crea los roles iniciales que no existan. Los existentes no se tocan, para no
-   * pisar los permisos que la Directora haya editado.
+   * pisar los permisos que la Directora haya editado. La excepción es la propia
+   * Directora, que tiene acceso total: recibe los permisos nuevos del catálogo y
+   * recupera los que se le hayan quitado.
    */
   async asegurarRolesIniciales(): Promise<number> {
     let creados = 0;
@@ -45,6 +47,11 @@ export class UsuariosService implements OnModuleInit {
       await this.rolModel.create(rol);
       creados++;
     }
+
+    await this.rolModel.updateOne(
+      { codigo: 'directora' },
+      { $addToSet: { permisos: { $each: [...PERMISOS] } } },
+    );
     return creados;
   }
 

@@ -35,6 +35,13 @@ export interface RolInicial {
 // ⏳ Faltan los otros 7 roles de la sección 7.2.
 export const ROLES_INICIALES: RolInicial[] = [
   {
+    codigo: 'directora',
+    nombre: 'Directora',
+    jerarquia: 1,
+    alcance: 'escuela',
+    permisos: [...PERMISOS],
+  },
+  {
     codigo: 'docente',
     nombre: 'Docente',
     jerarquia: 9,

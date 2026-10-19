@@ -777,7 +777,8 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 - **Se deniega por defecto:** una ruta sin `@RequierePermisos` responde 403. Las rutas sin sesión (salud y, más adelante, el login) se marcan con `@Publica()`.
 - **Roles iniciales:** se crean al iniciar la API si no existen, también en producción. Los ya existentes no se modifican, para no pisar lo que edite la Directora.
 - `usuarios.rol` guarda el **código** del rol (p. ej. `"docente"`).
-- Por ahora solo existe el rol `docente`, con los permisos de la tabla. ⏳ Faltan los demás roles.
+- Por ahora existen los roles `directora` y `docente`, con los permisos de la tabla. ⏳ Faltan los demás roles.
+- **La Directora siempre tiene todos los permisos:** al iniciar la API recibe los permisos nuevos del catálogo y recupera los que se le hayan quitado. Así nunca pierde el acceso a la administración.
 - ⏳ **Pendiente:** registrar los accesos denegados en `registroAuditoria` (módulo de auditoría) y la administración de usuarios y roles (PGT-51).
 
 ### 7.4 Alcance por curso
