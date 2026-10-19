@@ -11,6 +11,7 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "testTimeout": 120000,
+  "maxWorkers": 1,
   "globalSetup": "<rootDir>/entorno-global.ts",
   "globalTeardown": "<rootDir>/limpiar-entorno-global.ts"
 }

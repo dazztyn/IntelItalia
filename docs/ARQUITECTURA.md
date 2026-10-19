@@ -763,6 +763,24 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 
 ² El SIMCE son datos agregados de escuela, sin datos personales. Queda en "—" hasta validarlo con la escuela.
 
+**Implementación (PGT-7):**
+
+| Archivo | Uso |
+|---------|-----|
+| `backend/src/usuarios/permisos.ts` | Catálogo `PERMISOS` (la tabla de arriba) y `ROLES_INICIALES` |
+| `backend/src/usuarios/guards/permisos.guard.ts` | Guard global (`APP_GUARD`) |
+| `backend/src/usuarios/decorators/requiere-permisos.decorator.ts` | `@RequierePermisos(...)`, `@Publica()` y `@UsuarioActual()` |
+| `backend/src/usuarios/alcance.ts` | Filtro por curso para los servicios (sección 7.4) |
+
+- **Sesión:** el guard lee `request.sesion = { usuarioId }`, que llena el login (PGT-6) a partir del JWT. En cada request carga de la base el usuario y su rol, así que desactivar a alguien o cambiar sus permisos tiene efecto inmediato.
+- **Respuestas:** sin sesión, o con un usuario inexistente o inactivo, responde **401**. Si falta un permiso, responde **403**.
+- **Se deniega por defecto:** una ruta sin `@RequierePermisos` responde 403. Las rutas sin sesión (salud y, más adelante, el login) se marcan con `@Publica()`.
+- **Roles iniciales:** se crean al iniciar la API si no existen, también en producción. Los ya existentes no se modifican, para no pisar lo que edite la Directora.
+- `usuarios.rol` guarda el **código** del rol (p. ej. `"docente"`).
+- Por ahora existen los roles `directora` y `docente`, con los permisos de la tabla. ⏳ Faltan los demás roles.
+- **La Directora siempre tiene todos los permisos:** al iniciar la API recibe los permisos nuevos del catálogo y recupera los que se le hayan quitado. Así nunca pierde el acceso a la administración.
+- ⏳ **Pendiente:** registrar los accesos denegados en `registroAuditoria` (módulo de auditoría) y la administración de usuarios y roles (PGT-51).
+
 ### 7.4 Alcance por curso
 
 Además de los permisos, cada rol tiene un **`alcance`** guardado en `roles`. Así se cumple el principio de minimización sin codificar nada por rol:
@@ -776,6 +794,7 @@ Además de los permisos, cada rol tiene un **`alcance`** guardado en `roles`. As
 - **Acceso fuera del alcance:** pedir la ficha de un alumno de otro curso responde **403** y el intento queda en `registroAuditoria`.
 - **Asignación:** la Directora asigna los cursos de cada usuario desde `/admin/usuarios`. ⏳ Por definir si se asignan como profesor jefe, por asignatura o ambos.
 - Un usuario con alcance `cursosAsignados` y sin cursos asignados no ve ningún alumno.
+- **Implementación (PGT-7):** el guard deja en `request.usuario` (decorador `@UsuarioActual()`) el alcance y los `cursoIds` del usuario. Los servicios filtran con `cursosPermitidos(usuario)`, que devuelve `null` para el alcance `escuela` y los cursos asignados en otro caso, y con `tieneAccesoACurso(usuario, cursoId)`.
 
 ---
 

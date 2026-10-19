@@ -8,6 +8,7 @@ import { VariablesEntorno } from './configuracion/validacion';
 import { CursosModule } from './cursos/cursos.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SaludModule } from './salud/salud.module';
     CursosModule,
     AsignaturasModule,
     AlumnosModule,
+    UsuariosModule,
   ],
 })
 export class AppModule {}
