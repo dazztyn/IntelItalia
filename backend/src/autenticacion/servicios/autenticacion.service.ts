@@ -1,40 +1,40 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import {
-  SERVICIO_AUDITORIA_ACCESO,
-  type ServicioAuditoriaAcceso,
-} from '../interfaces/auditoria-acceso.interface';
-import {
-  PROVEEDOR_USUARIO_SESION,
-  type ProveedorUsuarioSesion,
-  type UsuarioSesion,
-} from '../interfaces/usuario-sesion.interface';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { AuditoriaRepository } from '../../auditoria/auditoria.repository';
+import type { UsuarioAutorizado } from '../../comun/autorizacion';
+import { UsuariosRepository } from '../../usuarios/repositorios/usuarios.repository';
+import { UsuariosService } from '../../usuarios/usuarios.service';
 import { VerificadorGoogleService } from './verificador-google.service';
 
 @Injectable()
 export class AutenticacionService {
   constructor(
     private readonly verificadorGoogle: VerificadorGoogleService,
-    @Inject(PROVEEDOR_USUARIO_SESION)
-    private readonly proveedorUsuario: ProveedorUsuarioSesion,
-    @Inject(SERVICIO_AUDITORIA_ACCESO)
-    private readonly auditoriaAcceso: ServicioAuditoriaAcceso,
+    private readonly usuariosRepo: UsuariosRepository,
+    private readonly usuariosService: UsuariosService,
+    private readonly auditoriaRepo: AuditoriaRepository,
   ) {}
 
   async autenticarConGoogle(
     idToken: string,
     ip: string,
-  ): Promise<UsuarioSesion> {
+  ): Promise<UsuarioAutorizado> {
     const identidad = await this.verificadorGoogle.verificarIdToken(idToken);
     const ahora = new Date();
 
-    const usuario = await this.proveedorUsuario.obtenerUsuarioPorCorreo(
+    const usuarioDoc = await this.usuariosRepo.buscarPorCorreo(
       identidad.correo,
     );
+    const usuarioAutorizado = usuarioDoc
+      ? await this.usuariosService.obtenerUsuarioAutorizado(
+          String(usuarioDoc._id),
+        )
+      : null;
 
-    if (!usuario || !usuario.activo) {
-      await this.auditoriaAcceso.registrarEventoAcceso({
-        usuarioId: usuario?.id ?? null,
+    if (!usuarioDoc || !usuarioAutorizado) {
+      await this.auditoriaRepo.registrar({
+        usuarioId: usuarioDoc?._id ?? null,
         accion: 'accesoDenegado',
+        recurso: 'sesion',
         ip,
         fecha: ahora,
       });
@@ -44,23 +44,27 @@ export class AutenticacionService {
       );
     }
 
+    const idTexto = String(usuarioAutorizado.id);
+
     await Promise.all([
-      this.proveedorUsuario.registrarUltimoAcceso(usuario.id, ahora),
-      this.auditoriaAcceso.registrarEventoAcceso({
-        usuarioId: usuario.id,
+      this.usuariosRepo.registrarUltimoAcceso(idTexto, ahora),
+      this.auditoriaRepo.registrar({
+        usuarioId: usuarioAutorizado.id,
         accion: 'inicioSesion',
+        recurso: 'sesion',
         ip,
         fecha: ahora,
       }),
     ]);
 
-    return usuario;
+    return usuarioAutorizado;
   }
 
   async registrarCierreSesion(usuarioId: string, ip: string): Promise<void> {
-    await this.auditoriaAcceso.registrarEventoAcceso({
+    await this.auditoriaRepo.registrar({
       usuarioId,
       accion: 'cierreSesion',
+      recurso: 'sesion',
       ip,
       fecha: new Date(),
     });

@@ -3,14 +3,14 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AlumnosModule } from './alumnos/alumnos.module';
 import { AsignaturasModule } from './asignaturas/asignaturas.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
+import { AutenticacionModule } from './autenticacion/autenticacion.module';
 import { opcionesRedisDesdeUrl } from './configuracion/redis';
 import { VariablesEntorno } from './configuracion/validacion';
 import { CursosModule } from './cursos/cursos.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
-import { AutenticacionModule } from './autenticacion/autenticacion.module';
-import { AuditoriaModule } from './auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -26,10 +26,10 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     SaludModule,
     CursosModule,
     AsignaturasModule,
-    AutenticacionModule,
-    AuditoriaModule,
     AlumnosModule,
+    AuditoriaModule,
     UsuariosModule,
+    AutenticacionModule,
   ],
 })
 export class AppModule {}

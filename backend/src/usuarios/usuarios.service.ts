@@ -1,84 +1,137 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { isObjectIdOrHexString, Model, Types } from 'mongoose';
-import { Alcance, Permiso, PERMISOS, ROLES_INICIALES } from './permisos';
-import { Rol } from './schemas/rol.schema';
-import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Types } from 'mongoose';
+import type { UsuarioAutorizado } from '../comun/autorizacion';
+import { VariablesEntorno } from '../configuracion/validacion';
+import { Permiso, ROLES_INICIALES } from './permisos';
+import { RolesRepository } from './repositorios/roles.repository';
+import {
+  UsuariosRepository
+} from './repositorios/usuarios.repository';
+import { RolDocument } from './schemas/rol.schema';
+import { UsuarioDocument } from './schemas/usuario.schema';
+import { DatosActualizarUsuario, DatosCrearUsuario } from './interfaces/datos-usuario.interface';
 
-export interface DatosUsuario {
-  correo: string;
-  nombre: string;
-  rol: string;
-  cursoIds?: Types.ObjectId[];
-  activo?: boolean;
-}
-
-/** Lo que el guard deja en `request.usuario` para filtrar por alcance en los servicios. */
-export interface UsuarioAutorizado {
-  id: Types.ObjectId;
-  rol: string;
-  alcance: Alcance;
-  permisos: Permiso[];
-  cursoIds: Types.ObjectId[];
-}
+export type { UsuarioAutorizado } from '../comun/autorizacion';
+export type DatosUsuario = DatosCrearUsuario;
 
 @Injectable()
 export class UsuariosService implements OnModuleInit {
   constructor(
-    @InjectModel(Usuario.name) private readonly usuarioModel: Model<Usuario>,
-    @InjectModel(Rol.name) private readonly rolModel: Model<Rol>,
+    private readonly usuariosRepo: UsuariosRepository,
+    private readonly rolesRepo: RolesRepository,
+    private readonly configuracion: ConfigService<VariablesEntorno, true>,
   ) {}
 
-  // También en producción, donde no corre la semilla: sin roles nadie podría entrar.
   async onModuleInit(): Promise<void> {
     await this.asegurarRolesIniciales();
+
+    const correoDirectora = this.configuracion.get(
+      'CORREO_DIRECTORA_INICIAL',
+      { infer: true },
+    );
+    if (correoDirectora) {
+      await this.usuariosRepo.asegurarDirectoraInicial(correoDirectora);
+    }
   }
 
-  /**
-   * Crea los roles iniciales que no existan. Los existentes no se tocan, para no
-   * pisar los permisos que la Directora haya editado. La excepción es la propia
-   * Directora, que tiene acceso total: recibe los permisos nuevos del catálogo y
-   * recupera los que se le hayan quitado.
-   */
-  async asegurarRolesIniciales(): Promise<number> {
-    let creados = 0;
-    for (const rol of ROLES_INICIALES) {
-      if (await this.rolModel.exists({ codigo: rol.codigo })) continue;
-      await this.rolModel.create(rol);
-      creados++;
-    }
-
-    await this.rolModel.updateOne(
-      { codigo: 'directora' },
-      { $addToSet: { permisos: { $each: [...PERMISOS] } } },
-    );
-    return creados;
+  asegurarRolesIniciales(): Promise<number> {
+    return this.rolesRepo.asegurarRolesIniciales(ROLES_INICIALES);
   }
 
   crear(datos: DatosUsuario): Promise<UsuarioDocument> {
-    return this.usuarioModel.create(datos);
+    return this.usuariosRepo.crear(datos);
   }
 
-  /**
-   * Usuario activo con los permisos y el alcance de su rol, leídos en cada request
-   * para que desactivarlo o cambiar sus permisos tenga efecto inmediato.
-   * `null` si no existe, está inactivo o su rol no existe.
-   */
+  async registrarEnListaBlanca(datos: DatosUsuario): Promise<UsuarioDocument> {
+    const rol = await this.rolesRepo.buscarPorCodigo(datos.rol);
+    if (!rol) {
+      throw new BadRequestException(`El rol '${datos.rol}' no existe`);
+    }
+
+    const existente = await this.usuariosRepo.buscarPorCorreo(datos.correo);
+    if (existente) {
+      throw new ConflictException(
+        'Ya existe un usuario registrado con ese correo',
+      );
+    }
+
+    return this.usuariosRepo.crear(datos);
+  }
+
+  listarUsuarios(): Promise<UsuarioDocument[]> {
+    return this.usuariosRepo.listarTodos();
+  }
+
+  listarRoles(): Promise<RolDocument[]> {
+    return this.rolesRepo.listarTodos();
+  }
+
+  async actualizarUsuario(
+    id: string,
+    datos: DatosActualizarUsuario,
+    usuarioActualId?: Types.ObjectId,
+  ): Promise<UsuarioDocument> {
+    if (datos.rol) {
+      const rol = await this.rolesRepo.buscarPorCodigo(datos.rol);
+      if (!rol) {
+        throw new BadRequestException(`El rol '${datos.rol}' no existe`);
+      }
+    }
+
+    if (
+      datos.activo === false &&
+      usuarioActualId &&
+      String(usuarioActualId) === id
+    ) {
+      throw new BadRequestException(
+        'No puede desactivar su propia cuenta de usuario',
+      );
+    }
+
+    const actualizado = await this.usuariosRepo.actualizar(id, datos);
+    if (!actualizado) {
+      throw new NotFoundException('El usuario no existe');
+    }
+    return actualizado;
+  }
+
+  async actualizarPermisosRol(
+    codigo: string,
+    permisos: Permiso[],
+  ): Promise<RolDocument> {
+    if (codigo === 'directora' && !permisos.includes('usuarios.gestionar')) {
+      throw new BadRequestException(
+        'El rol de Directora no puede perder el permiso usuarios.gestionar',
+      );
+    }
+
+    const rol = await this.rolesRepo.actualizarPermisos(codigo, permisos);
+    if (!rol) {
+      throw new NotFoundException(`El rol '${codigo}' no existe`);
+    }
+    return rol;
+  }
+
   async obtenerUsuarioAutorizado(
     usuarioId: string,
   ): Promise<UsuarioAutorizado | null> {
-    if (!isObjectIdOrHexString(usuarioId)) return null;
-
-    const usuario = await this.usuarioModel
-      .findOne({ _id: usuarioId, activo: true })
-      .exec();
+    const usuario = await this.usuariosRepo.buscarActivoPorId(usuarioId);
     if (!usuario) return null;
 
-    const rol = await this.rolModel.findOne({ codigo: usuario.rol }).exec();
+    const rol = await this.rolesRepo.buscarPorCodigo(usuario.rol);
     if (!rol) return null;
 
     return {
       id: usuario._id,
+      correo: usuario.correo,
+      nombre: usuario.nombre,
       rol: rol.codigo,
       alcance: rol.alcance,
       permisos: rol.permisos,

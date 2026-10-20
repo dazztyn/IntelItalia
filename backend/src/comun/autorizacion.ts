@@ -11,6 +11,10 @@ export const CLAVE_PERMISOS = 'permisosRequeridos';
 export const CLAVE_PUBLICA = 'rutaPublica';
 export const CLAVE_SOLO_AUTENTICADO = 'rutaSoloAutenticado';
 
+export interface ExtractorSesionHttp {
+  extraerUsuarioIdDePeticion(peticion: Request): Promise<string | null>;
+}
+
 export interface UsuarioAutorizado {
   id: Types.ObjectId;
   correo: string;

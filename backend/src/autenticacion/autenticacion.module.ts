@@ -1,23 +1,24 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
+import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { VariablesEntorno } from '../configuracion/validacion';
+import { EXTRACTOR_SESION_HTTP } from '../usuarios/guards/permisos.guard';
+import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AutenticacionController } from './autenticacion.controller';
-import { SesionGuard } from './guards/sesion.guard';
-import { SERVICIO_AUDITORIA_ACCESO } from './interfaces/auditoria-acceso.interface';
-import { PROVEEDOR_USUARIO_SESION } from './interfaces/usuario-sesion.interface';
 import { AutenticacionService } from './servicios/autenticacion.service';
 import { SesionCookieService } from './servicios/sesion-cookie.service';
 import {
   CLIENTE_OAUTH_GOOGLE,
   VerificadorGoogleService,
 } from './servicios/verificador-google.service';
-import { AuditoriaAccesoProvisionalService, ProveedorUsuarioProvisionalService } from './servicios/adaptadores-provisionales.service';
 
+@Global()
 @Module({
   imports: [
+    UsuariosModule,
+    AuditoriaModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configuracion: ConfigService<VariablesEntorno, true>) => ({
@@ -44,18 +45,10 @@ import { AuditoriaAccesoProvisionalService, ProveedorUsuarioProvisionalService }
         ),
     },
     {
-      provide: PROVEEDOR_USUARIO_SESION,
-      useClass: ProveedorUsuarioProvisionalService,
-    },
-    {
-      provide: SERVICIO_AUDITORIA_ACCESO,
-      useClass: AuditoriaAccesoProvisionalService,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: SesionGuard,
+      provide: EXTRACTOR_SESION_HTTP,
+      useExisting: SesionCookieService,
     },
   ],
-  exports: [SesionCookieService, PROVEEDOR_USUARIO_SESION],
+  exports: [SesionCookieService, EXTRACTOR_SESION_HTTP],
 })
 export class AutenticacionModule {}

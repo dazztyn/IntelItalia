@@ -9,10 +9,13 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { RutaPublica } from './decoradores/ruta-publica.decorator';
-import { UsuarioActual } from './decoradores/usuario-actual.decorator';
+import {
+  Publica,
+  SoloAutenticado,
+  UsuarioActual,
+  type UsuarioAutorizado,
+} from '../comun/autorizacion';
 import { LoginGoogleDto } from './dto/login-google.dto';
-import type { UsuarioSesion } from './interfaces/usuario-sesion.interface';
 import { AutenticacionService } from './servicios/autenticacion.service';
 import { SesionCookieService } from './servicios/sesion-cookie.service';
 
@@ -23,14 +26,14 @@ export class AutenticacionController {
     private readonly sesionCookieService: SesionCookieService,
   ) {}
 
-  @RutaPublica()
+  @Publica()
   @Post('google')
   @HttpCode(HttpStatus.OK)
   async iniciarSesionConGoogle(
     @Body() dto: LoginGoogleDto,
     @Req() peticion: Request,
     @Res({ passthrough: true }) respuesta: Response,
-  ): Promise<UsuarioSesion> {
+  ): Promise<UsuarioAutorizado> {
     const ip = peticion.ip || 'desconocida';
     const usuario = await this.autenticacionService.autenticarConGoogle(
       dto.idToken,
@@ -38,27 +41,34 @@ export class AutenticacionController {
     );
 
     await this.sesionCookieService.emitirSesionEnCookie(respuesta, {
-      sub: usuario.id,
+      sub: String(usuario.id),
       correo: usuario.correo,
     });
 
     return usuario;
   }
 
+  @SoloAutenticado()
   @Get('perfil')
-  obtenerPerfil(@UsuarioActual() usuario: UsuarioSesion): UsuarioSesion {
+  obtenerPerfil(
+    @UsuarioActual() usuario: UsuarioAutorizado,
+  ): UsuarioAutorizado {
     return usuario;
   }
 
+  @SoloAutenticado()
   @Post('salir')
   @HttpCode(HttpStatus.NO_CONTENT)
   async cerrarSesion(
-    @UsuarioActual() usuario: UsuarioSesion,
+    @UsuarioActual() usuario: UsuarioAutorizado,
     @Req() peticion: Request,
     @Res({ passthrough: true }) respuesta: Response,
   ): Promise<void> {
     const ip = peticion.ip || 'desconocida';
     this.sesionCookieService.limpiarCookieSesion(respuesta);
-    await this.autenticacionService.registrarCierreSesion(usuario.id, ip);
+    await this.autenticacionService.registrarCierreSesion(
+      String(usuario.id),
+      ip,
+    );
   }
 }

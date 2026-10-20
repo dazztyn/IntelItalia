@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { CookieOptions, Request, Response } from 'express';
 import { VariablesEntorno } from '../../configuracion/validacion';
+import { ExtractorSesionHttp } from '../../usuarios/guards/permisos.guard';
 import { PayloadJwt } from '../interfaces/payload-jwt.interface';
 
 export const NOMBRE_COOKIE_SESION = 'intelitalia_sesion';
 
 @Injectable()
-export class SesionCookieService {
+export class SesionCookieService implements ExtractorSesionHttp {
   private readonly esProduccion: boolean;
   private readonly duracionSegundos: number;
 
@@ -54,6 +55,15 @@ export class SesionCookieService {
       return await this.jwtService.verifyAsync<PayloadJwt>(token);
     } catch {
       throw new UnauthorizedException('La sesión es inválida o ha expirado');
+    }
+  }
+
+  async extraerUsuarioIdDePeticion(peticion: Request): Promise<string | null> {
+    try {
+      const payload = await this.extraerYVerificarToken(peticion);
+      return payload.sub;
+    } catch {
+      return null;
     }
   }
 
