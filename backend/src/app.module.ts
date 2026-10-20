@@ -11,10 +11,12 @@ import { CursosModule } from './cursos/cursos.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
     NucleoModule,
+    EventEmitterModule.forRoot(),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configuracion: ConfigService<VariablesEntorno, true>) => ({

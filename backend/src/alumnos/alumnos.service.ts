@@ -6,24 +6,9 @@ import { claveNombre } from '../comun/texto';
 import {
   Alumno,
   AlumnoDocument,
-  DatosPie,
-  EstadoMatricula,
+  DatosPie
 } from './alumno.schema';
-
-export interface DatosAlumno {
-  rut?: string | null;
-  ipe?: string | null;
-  nombres: string;
-  apellidoPaterno: string;
-  apellidoMaterno?: string | null;
-  fechaNacimiento?: Date | null;
-  matriculas?: Array<{
-    anio: number;
-    cursoId: Types.ObjectId;
-    estado?: EstadoMatricula;
-  }>;
-  pie?: DatosPie;
-}
+import { DatosAlumno } from './interfaces/datos-alumno.interface';
 
 @Injectable()
 export class AlumnosService {

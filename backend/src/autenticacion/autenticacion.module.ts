@@ -2,7 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
-import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { VariablesEntorno } from '../configuracion/validacion';
 import { EXTRACTOR_SESION_HTTP } from '../usuarios/guards/permisos.guard';
 import { UsuariosModule } from '../usuarios/usuarios.module';
@@ -18,7 +17,6 @@ import {
 @Module({
   imports: [
     UsuariosModule,
-    AuditoriaModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configuracion: ConfigService<VariablesEntorno, true>) => ({

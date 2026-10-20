@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
   AuditoriaRepository,
-  MongooseAuditoriaRepository,
 } from './auditoria.repository';
 import {
   RegistroAuditoria,
   RegistroAuditoriaSchema,
 } from './schemas/registro-auditoria.schema';
+import { AuditoriaListener } from './auditoria.listener';
+import { MongooseAuditoriaRepository } from './repositorios/mongoose-auditoria.repository';
 
 @Module({
   imports: [
@@ -16,10 +17,12 @@ import {
     ]),
   ],
   providers: [
+    AuditoriaListener,
     {
       provide: AuditoriaRepository,
       useClass: MongooseAuditoriaRepository,
     },
+    
   ],
   exports: [AuditoriaRepository],
 })

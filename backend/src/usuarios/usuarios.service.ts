@@ -138,4 +138,29 @@ export class UsuariosService implements OnModuleInit {
       cursoIds: usuario.cursoIds,
     };
   }
+
+  async obtenerUsuarioAutorizadoPorCorreo(
+    correo: string,
+  ): Promise<UsuarioAutorizado | null> {
+    const usuario = await this.usuariosRepo.buscarPorCorreo(correo);
+    if (!usuario || !usuario.activo) return null;
+
+    const rol = await this.rolesRepo.buscarPorCodigo(usuario.rol);
+    if (!rol) return null;
+
+    return {
+      id: usuario._id,
+      correo: usuario.correo,
+      nombre: usuario.nombre,
+      rol: rol.codigo,
+      alcance: rol.alcance,
+      permisos: rol.permisos,
+      cursoIds: usuario.cursoIds,
+    };
+  }
+
+  async registrarUltimoAcceso(id: string, fecha: Date): Promise<void> {
+    await this.usuariosRepo.registrarUltimoAcceso(id, fecha);
+  }
+
 }
