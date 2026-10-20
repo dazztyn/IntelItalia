@@ -6,9 +6,13 @@ export interface VariablesEntorno {
   MONGO_URI: string;
   REDIS_URL: string;
   ORIGEN_FRONTEND: string;
+  GOOGLE_CLIENT_ID: string;
+  DOMINIO_GOOGLE_PERMITIDO?: string;
+  JWT_SECRETO: string;
+  JWT_DURACION_SEGUNDOS: number;
+  CORREO_DIRECTORA_INICIAL?: string;
 }
 
-// Si falta una variable obligatoria o tiene un formato inválido, la API no arranca.
 export const esquemaVariablesEntorno = Joi.object<VariablesEntorno>({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
@@ -21,4 +25,9 @@ export const esquemaVariablesEntorno = Joi.object<VariablesEntorno>({
     .uri({ scheme: ['redis', 'rediss'] })
     .required(),
   ORIGEN_FRONTEND: Joi.string().uri().default('http://localhost:5173'),
+  GOOGLE_CLIENT_ID: Joi.string().trim().min(10).required(),
+  DOMINIO_GOOGLE_PERMITIDO: Joi.string().trim().allow('').optional(),
+  JWT_SECRETO: Joi.string().min(32).required(),
+  JWT_DURACION_SEGUNDOS: Joi.number().integer().positive().default(36000),
+  CORREO_DIRECTORA_INICIAL: Joi.string().email().lowercase().optional(),
 });
