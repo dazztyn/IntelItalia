@@ -1,5 +1,6 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { Publica } from '../usuarios/decorators/requiere-permisos.decorator';
 import { EstadoSalud, SaludService } from './salud.service';
 import { RutaPublica } from '../autenticacion/decoradores/ruta-publica.decorator';
 
