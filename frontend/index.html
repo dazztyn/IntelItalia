@@ -1,10 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>intelitalia</title>
+    <title>IntelItalia</title>
+    <script>
+      try {
+        var guardado = localStorage.getItem('tema')
+        var oscuro = guardado
+          ? guardado === 'oscuro'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.classList.toggle('dark', oscuro)
+      } catch (e) {
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
