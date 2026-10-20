@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Obtener ID Token para Postman</h2>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <div id="g_id_onload"
+       data-client_id="73313718798-gfg1k780lkmvqt3eld2thgf7fop447ko.apps.googleusercontent.com"
+       data-callback="manejarToken">
+  </div>
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <h3 style="margin-top: 20px;">Tu Token (Cópialo de aquí):</h3>
+  <textarea id="token-display" rows="10" cols="80" readonly placeholder="El token aparecerá aquí cuando inicies sesión..." style="padding: 10px; font-family: monospace;"></textarea>
+
+  <script>
+    function manejarToken(respuesta) {
+      const token = respuesta.credential;
+      
+      // Mostrar en la pantalla
+      const cuadroTexto = document.getElementById("token-display");
+      cuadroTexto.value = token;
+      
+      // Seleccionar el texto automáticamente para facilitar la copia
+      cuadroTexto.select();
+      
+      alert("¡Token recibido! Cópialo del cuadro de texto que apareció en pantalla.");
+    }
+  </script>
+</body>
+</html>
