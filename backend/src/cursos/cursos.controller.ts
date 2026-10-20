@@ -1,9 +1,20 @@
-import {Controller,ForbiddenException,Get, NotFoundException, Param, ParseIntPipe, Query} from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { AlumnosService } from '../alumnos/alumnos.service';
 import { cursosPermitidos, tieneAccesoACurso } from '../usuarios/alcance';
-import { RequierePermisos, UsuarioActual} from '../usuarios/decorators/requiere-permisos.decorator';
+import {
+  RequierePermisos,
+  UsuarioActual,
+} from '../usuarios/decorators/requiere-permisos.decorator';
 import type { UsuarioAutorizado } from '../usuarios/usuarios.service';
 import { CursosService } from './cursos.service';
 
