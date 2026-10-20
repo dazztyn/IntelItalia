@@ -1,6 +1,7 @@
 export const PROVEEDOR_USUARIO_SESION = 'PROVEEDOR_USUARIO_SESION';
 
-export interface UsuarioSesion {
+export interface UsuarioSesion 
+{
   id: string;
   correo: string;
   nombre: string;
@@ -11,6 +12,9 @@ export interface UsuarioSesion {
   cursoIds: string[];
 }
 
-export interface ProveedorUsuarioSesion {
+export interface ProveedorUsuarioSesion 
+{
   obtenerUsuarioPorId(id: string): Promise<UsuarioSesion | null>;
+  obtenerUsuarioPorCorreo(correo: string): Promise<UsuarioSesion | null>;
+  registrarUltimoAcceso(id: string, fecha: Date): Promise<void>;
 }
