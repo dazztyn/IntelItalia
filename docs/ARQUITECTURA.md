@@ -189,7 +189,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   - todo alumno necesita RUT o IPE, y no puede tener dos matrículas **activas** el mismo año (una retirada y otra activa sí, para cambios de curso);
   - `nombreNormalizado` no depende del orden de nombres y apellidos: "Pérez Soto Ana María" y "Ana María Pérez Soto" dan la misma clave. Sirve para identificar al alumno en fuentes sin RUT;
   - `pie` tiene `select: false`: **no aparece en ninguna consulta** salvo que se pida explícitamente (`AlumnosService.obtenerDatosPie`), que solo se usará detrás del permiso `pie.ver`;
-  - todavía no hay endpoints HTTP: llegan con el login y los permisos (PGT-6, PGT-7), para no exponer datos de alumnos sin control de acceso.
+  - los alumnos se listan por curso con `GET /api/cursos/:id/alumnos` (sección 3.2). La ficha del alumno (`GET /api/alumnos/:id`) llega con el módulo de auditoría, porque cada acceso a una ficha se registra.
 - **Minimización:** solo se guardan los campos que se usan. No se importan dirección, teléfono, datos del apoderado ni diagnósticos detallados, aunque vengan en el archivo.
 
 ### 3.2 `cursos`
@@ -216,6 +216,15 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   - Si el nivel tiene **más de un curso**, la letra del archivo tiene que coincidir con la de un curso. Si el archivo no trae letra o la letra no existe, la fila se marca como **error que hay que resolver**.
   - Cada parser traduce el formato de curso de su fuente ("3° Básico A", "3 A", "3°B") a nivel + letra.
 - **Cuando la escuela empiece a usar letras:** se crean los cursos del año nuevo con su letra (p. ej. 3° A y 3° B). Los cursos de años anteriores, con `letra: null`, no cambian, así que el historial se mantiene.
+- **Implementación (PGT-56/57):** dos endpoints de lectura, ambos con `@RequierePermisos('alumnos.ver')` y el alcance por curso de la [sección 7.4](#74-alcance-por-curso):
+
+| Endpoint | Responde | Errores |
+|----------|----------|---------|
+| `GET /api/cursos?anio=2026` | `[{ id, anio, nivel, letra, nombre }]` en orden de nivel. Sin `anio`, usa el año actual. Un docente solo recibe sus cursos | 400 si `anio` no es un número |
+| `GET /api/cursos/:id/alumnos` | `[{ id, rut, ipe, nombres, apellidoPaterno, apellidoMaterno }]`: alumnos con matrícula activa en el curso, ordenados por apellido | 400 si el id no es válido; 403 si el curso está fuera del alcance (se revisa antes de buscarlo, para no revelar qué ids existen); 404 si no existe |
+
+  - El listado de alumnos **nunca** incluye `pie`, `nombreNormalizado` ni `matriculas` (minimización, sección 8.4).
+  - Sin sesión responden 401, como todas las rutas protegidas (sección 7.3).
 
 ### 3.3 `asignaturas`
 
@@ -231,7 +240,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 
 - El campo **`area`** permite que las alertas "solo Lenguaje" o "solo Matemática" funcionen aunque cada curso o archivo nombre la asignatura de otra forma.
 - Los **`aliases`** permiten reconocer la asignatura al cargar archivos con nombres distintos.
-- **Implementación (PGT-43):** el campo calculado `nombresNormalizados` (nombre y aliases sin tildes ni mayúsculas) permite buscar por cualquiera de ellos. Un alias puede repetirse entre niveles ("Lenguaje" en PK/K y en básica), así que al cargar se busca **dentro de las asignaturas del curso** (`curso.asignaturaIds`). El catálogo inicial está en `backend/src/asignaturas/catalogo.ts` (⏳ confirmar con la malla de la escuela y los nombres de Mi Aula, sobre todo PK y K).
+- **Implementación (PGT-43):** el campo calculado `nombresNormalizados` (nombre y aliases sin tildes y en mayúsculas) permite buscar por cualquiera de ellos. Un alias puede repetirse entre niveles ("Lenguaje" en PK/K y en básica), así que al cargar se busca **dentro de las asignaturas del curso** (`curso.asignaturaIds`). El catálogo inicial está en `backend/src/asignaturas/catalogo.ts` (⏳ confirmar con la malla de la escuela y los nombres de Mi Aula, sobre todo PK y K).
 
 ### 3.4 `calificaciones`
 

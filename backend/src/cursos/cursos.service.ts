@@ -26,9 +26,17 @@ export class CursosService {
     return this.cursoModel.create(datos);
   }
 
-  /** Cursos del año en orden de nivel (PK, K, 1° … 8°) y letra. */
-  async listarPorAnio(anio: number): Promise<CursoDocument[]> {
-    const cursos = await this.cursoModel.find({ anio }).exec();
+  /**
+   * Cursos del año en orden de nivel (PK, K, 1° … 8°) y letra. Con `cursoIds`
+   * (alcance `cursosAsignados`, ver usuarios/alcance.ts) solo devuelve esos.
+   */
+  async listarPorAnio(
+    anio: number,
+    cursoIds: Types.ObjectId[] | null = null,
+  ): Promise<CursoDocument[]> {
+    const cursos = await this.cursoModel
+      .find({ anio, ...(cursoIds ? { _id: { $in: cursoIds } } : {}) })
+      .exec();
     return cursos.sort(
       (a, b) =>
         NIVELES.indexOf(a.nivel) - NIVELES.indexOf(b.nivel) ||

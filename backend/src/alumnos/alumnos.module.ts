@@ -3,8 +3,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Alumno, AlumnoSchema } from './alumno.schema';
 import { AlumnosService } from './alumnos.service';
 
-// Sin controlador todavía: exponer datos de alumnos antes del login y del guard de
-// permisos (PGT-6, PGT-7) los dejaría abiertos. Los endpoints llegan con esas tareas.
+// Sin controlador propio todavía: el listado por curso está en CursosController
+// (GET /api/cursos/:id/alumnos). La ficha llega con la auditoría de accesos.
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Alumno.name, schema: AlumnoSchema }]),
