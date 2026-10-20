@@ -1,12 +1,9 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { Publica } from '../usuarios/decorators/requiere-permisos.decorator';
 import { EstadoSalud, SaludService } from './salud.service';
-import { RutaPublica } from '../autenticacion/decoradores/ruta-publica.decorator';
+import { Publica } from '../comun/autorizacion';
 
-// Endpoint público para los healthchecks de Docker y del proxy.
-// No expone datos personales ni detalles internos de los servicios.
-@RutaPublica()
+@Publica()
 @Controller('salud')
 export class SaludController {
   constructor(private readonly saludService: SaludService) {}

@@ -9,12 +9,12 @@ import { CursosModule } from './cursos/cursos.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { AutenticacionModule } from './autenticacion/autenticacion.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 
 @Module({
   imports: [
     NucleoModule,
-    // Configuración compartida de las colas. Todavía no hay colas registradas,
-    // así que BullMQ no abre conexiones hasta que un módulo agregue una.
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configuracion: ConfigService<VariablesEntorno, true>) => ({
@@ -26,6 +26,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     SaludModule,
     CursosModule,
     AsignaturasModule,
+    AutenticacionModule,
+    AuditoriaModule,
     AlumnosModule,
     UsuariosModule,
   ],
