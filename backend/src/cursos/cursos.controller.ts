@@ -10,12 +10,12 @@ import {
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { AlumnosService } from '../alumnos/alumnos.service';
-import { cursosPermitidos, tieneAccesoACurso } from '../usuarios/alcance';
 import {
   RequierePermisos,
   UsuarioActual,
-} from '../usuarios/decorators/requiere-permisos.decorator';
-import type { UsuarioAutorizado } from '../usuarios/usuarios.service';
+  type UsuarioAutorizado,
+} from '../comun/autorizacion';
+import { cursosPermitidos, tieneAccesoACurso } from '../usuarios/alcance';
 import { CursosService } from './cursos.service';
 
 @Controller('cursos')

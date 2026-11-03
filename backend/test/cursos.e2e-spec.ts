@@ -6,6 +6,7 @@ import { Connection, Types } from 'mongoose';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import type { SolicitudAutorizada } from './../src/comun/autorizacion';
 import { configurarApp } from './../src/configurar-app';
 import { CursosService } from './../src/cursos/cursos.service';
 import { CLIENTE_REDIS_SALUD } from './../src/salud/salud.service';
@@ -14,7 +15,6 @@ import {
   ALUMNOS_POR_CURSO,
   SemillaService,
 } from './../src/semilla/semilla.service';
-import type { SolicitudAutorizada } from './../src/usuarios/decorators/requiere-permisos.decorator';
 import { UsuariosService } from './../src/usuarios/usuarios.service';
 
 // Corre contra MongoDB en memoria (test/entorno-global.ts) con datos ficticios.
