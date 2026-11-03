@@ -5,6 +5,8 @@ describe('esquemaVariablesEntorno', () => {
   const variablesValidas = {
     MONGO_URI: 'mongodb://localhost:27017/intelitalia',
     REDIS_URL: 'redis://localhost:6379',
+    GOOGLE_CLIENT_ID: 'cliente-de-prueba.apps.googleusercontent.com',
+    JWT_SECRETO: 'secreto-de-prueba-de-al-menos-32-caracteres',
   };
 
   it('acepta una configuración mínima y completa los valores por defecto', () => {

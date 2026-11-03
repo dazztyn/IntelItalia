@@ -15,4 +15,6 @@ export default async function iniciarEntornoE2e(): Promise<void> {
 
   // Redis se reemplaza por un doble en cada test; esta URL solo pasa la validación.
   process.env.REDIS_URL = 'redis://localhost:6379';
+  process.env.GOOGLE_CLIENT_ID = 'cliente-de-prueba.apps.googleusercontent.com';
+  process.env.JWT_SECRETO = 'secreto-de-prueba-de-al-menos-32-caracteres';
 }
