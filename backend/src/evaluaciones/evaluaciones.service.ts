@@ -5,7 +5,6 @@ import type { Area } from '../asignaturas/asignatura.schema';
 import {
   NivelNormalizado,
   ResultadoEvaluacion,
-  ResultadoEvaluacionDocument,
 } from './schemas/resultado-evaluacion.schema';
 import {
   TipoEvaluacion,
@@ -69,13 +68,28 @@ export class EvaluacionesService implements OnModuleInit {
       .exec();
   }
 
-  /** Resultados del alumno, del año más reciente al más antiguo. */
-  listarPorAlumno(
-    alumnoId: Types.ObjectId,
-  ): Promise<ResultadoEvaluacionDocument[]> {
-    return this.resultadoModel
+  /**
+   * Resultados del alumno con su instrumento, del año más reciente al más antiguo
+   * y, dentro del año, en el orden de los momentos del instrumento.
+   */
+  async listarPorAlumno(alumnoId: Types.ObjectId) {
+    const resultados = await this.resultadoModel
       .find({ alumnoId })
-      .sort({ anio: -1, momento: 1, area: 1 })
+      .populate<{
+        tipoEvaluacionId: Pick<
+          TipoEvaluacion,
+          'codigo' | 'nombre' | 'momentos'
+        >;
+      }>('tipoEvaluacionId', 'codigo nombre momentos')
       .exec();
+    const orden = (r: (typeof resultados)[number]) =>
+      r.tipoEvaluacionId.momentos.indexOf(r.momento);
+    return resultados.sort(
+      (a, b) =>
+        b.anio - a.anio ||
+        a.tipoEvaluacionId.codigo.localeCompare(b.tipoEvaluacionId.codigo) ||
+        orden(a) - orden(b) ||
+        a.area.localeCompare(b.area),
+    );
   }
 }

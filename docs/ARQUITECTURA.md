@@ -189,7 +189,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   - todo alumno necesita RUT o IPE, y no puede tener dos matrículas **activas** el mismo año (una retirada y otra activa sí, para cambios de curso);
   - `nombreNormalizado` no depende del orden de nombres y apellidos: "Pérez Soto Ana María" y "Ana María Pérez Soto" dan la misma clave. Sirve para identificar al alumno en fuentes sin RUT;
   - `pie` tiene `select: false`: **no aparece en ninguna consulta** salvo que se pida explícitamente (`AlumnosService.obtenerDatosPie`), que solo se usará detrás del permiso `pie.ver`;
-  - los alumnos se listan por curso con `GET /api/cursos/:id/alumnos` (sección 3.2). La ficha del alumno (`GET /api/alumnos/:id`) llega con el módulo de auditoría, porque cada acceso a una ficha se registra.
+  - los alumnos se listan por curso con `GET /api/cursos/:id/alumnos` (sección 3.2), y la ficha de cada uno se obtiene con `GET /api/alumnos/:id` (sección 9.1).
 - **Minimización:** solo se guardan los campos que se usan. No se importan dirección, teléfono, datos del apoderado ni diagnósticos detallados, aunque vengan en el archivo.
 
 ### 3.2 `cursos`
@@ -977,6 +977,37 @@ Como el hosting todavía no está definido, el cumplimiento se apoya sobre todo 
 - Los colores del semáforo van acompañados de texto o ícono, para no depender solo del color (accesibilidad).
 
 ---
+
+### 9.1 Implementación de la ficha del alumno (PGT-9)
+
+`GET /api/alumnos/:id`, en `backend/src/fichas/`. Va en un módulo aparte porque junta alumnos, cursos y evaluaciones. **Contrato para el frontend:**
+
+```json
+{
+  "id": "…", "rut": "12345678-5", "ipe": null,
+  "nombres": "Ana María", "apellidoPaterno": "Pérez", "apellidoMaterno": "Soto",
+  "matriculas": [{ "anio": 2026, "estado": "activa", "curso": { "id": "…", "nombre": "3° Básico" } }],
+  "pie": { "participa": true, "tipoNee": "transitoria" },
+  "evaluaciones": [{
+    "tipo": "DIA", "nombre": "Diagnóstico Integral de Aprendizajes",
+    "anio": 2026, "momento": "diagnostico", "area": "lenguaje",
+    "resultados": { "porcentajesPorEje": { "localizar": 55, "interpretarRelacionar": 70, "reflexionar": 20 }, "porcentajeLogro": 48.33 },
+    "nivelNormalizado": null
+  }],
+  "semaforo": null,
+  "alertas": []
+}
+```
+
+- **Permiso:** `alumnos.ver`. Sin sesión responde 401.
+- **Alcance:** un usuario con `cursosAsignados` solo ve a los alumnos con alguna matrícula en sus cursos. Si no, responde **403** y registra `accesoDenegado`.
+- **`pie`** solo viene si el usuario tiene `pie.ver` (sección 8.2). Puede ser `null` si el alumno no tiene el dato. Sin el permiso, el campo **no aparece**.
+- **Orden:** `matriculas` va del año más reciente al más antiguo. `evaluaciones` también, y dentro del año va por instrumento, momento (en el orden del instrumento: diagnóstico, monitoreo, cierre) y área.
+- **`nivelNormalizado: null`** significa "sin clasificar": el DIA todavía no tiene cortes (sección 4.3).
+- ⏳ **`semaforo` y `alertas`** van vacíos hasta que exista el motor de alertas (sección 5). Después se llenan desde `estadosAlumno` y `alertas`, sin cambiar el contrato.
+- ⏳ **Notas y asistencia** no vienen todavía: dependen del formato de Mi Aula. El frontend muestra esa sección como pendiente.
+- **Auditoría:** cada acceso registra `ficha.ver`, con `alumnoId`.
+- **Errores:** 400 si el id no es válido, 404 si el alumno no existe.
 
 ## 10. Preguntas abiertas y próximos pasos
 

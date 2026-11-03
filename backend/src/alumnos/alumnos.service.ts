@@ -17,6 +17,10 @@ export class AlumnosService {
     return this.alumnoModel.create(datos);
   }
 
+  buscarPorId(id: Types.ObjectId): Promise<AlumnoDocument | null> {
+    return this.alumnoModel.findById(id).exec();
+  }
+
   buscarPorRut(rut: string): Promise<AlumnoDocument | null> {
     return this.alumnoModel.findOne({ rut: normalizarRut(rut) }).exec();
   }
