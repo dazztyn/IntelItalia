@@ -11,7 +11,7 @@ export function configurarApp(app: INestApplication): void {
     set?: (clave: string, valor: unknown) => void;
   };
   adaptadorHttp.set?.('trust proxy', 1);
-  
+
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.useGlobalPipes(

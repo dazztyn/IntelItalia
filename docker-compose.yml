@@ -49,6 +49,10 @@ services:
       MONGO_URI: mongodb://${MONGO_USUARIO_APP}:${MONGO_CLAVE_APP}@mongo:27017/intelitalia
       REDIS_URL: redis://:${REDIS_CLAVE}@redis:6379
       ORIGEN_FRONTEND: ${ORIGEN_FRONTEND:-http://localhost:8080}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      DOMINIO_GOOGLE_PERMITIDO: ${DOMINIO_GOOGLE_PERMITIDO:-}
+      JWT_SECRETO: ${JWT_SECRETO}
+      CORREO_DIRECTORA_INICIAL: ${CORREO_DIRECTORA_INICIAL:-}
     depends_on:
       mongo:
         condition: service_healthy

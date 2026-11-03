@@ -1,40 +1,34 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import {
-  SERVICIO_AUDITORIA_ACCESO,
-  type ServicioAuditoriaAcceso,
-} from '../interfaces/auditoria-acceso.interface';
-import {
-  PROVEEDOR_USUARIO_SESION,
-  type ProveedorUsuarioSesion,
-  type UsuarioSesion,
-} from '../interfaces/usuario-sesion.interface';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { UsuarioAutorizado } from '../../comun/autorizacion';
+import { UsuariosService } from '../../usuarios/usuarios.service';
 import { VerificadorGoogleService } from './verificador-google.service';
 
 @Injectable()
 export class AutenticacionService {
   constructor(
     private readonly verificadorGoogle: VerificadorGoogleService,
-    @Inject(PROVEEDOR_USUARIO_SESION)
-    private readonly proveedorUsuario: ProveedorUsuarioSesion,
-    @Inject(SERVICIO_AUDITORIA_ACCESO)
-    private readonly auditoriaAcceso: ServicioAuditoriaAcceso,
+    private readonly usuariosService: UsuariosService,
+    private readonly emisorEventos: EventEmitter2,
   ) {}
 
   async autenticarConGoogle(
     idToken: string,
     ip: string,
-  ): Promise<UsuarioSesion> {
+  ): Promise<UsuarioAutorizado> {
     const identidad = await this.verificadorGoogle.verificarIdToken(idToken);
     const ahora = new Date();
 
-    const usuario = await this.proveedorUsuario.obtenerUsuarioPorCorreo(
-      identidad.correo,
-    );
+    const usuarioAutorizado =
+      await this.usuariosService.obtenerUsuarioAutorizadoPorCorreo(
+        identidad.correo,
+      );
 
-    if (!usuario || !usuario.activo) {
-      await this.auditoriaAcceso.registrarEventoAcceso({
-        usuarioId: usuario?.id ?? null,
+    if (!usuarioAutorizado) {
+      this.emisorEventos.emit('auditoria.acceso', {
+        usuarioId: null,
         accion: 'accesoDenegado',
+        recurso: 'sesion',
         ip,
         fecha: ahora,
       });
@@ -44,23 +38,26 @@ export class AutenticacionService {
       );
     }
 
-    await Promise.all([
-      this.proveedorUsuario.registrarUltimoAcceso(usuario.id, ahora),
-      this.auditoriaAcceso.registrarEventoAcceso({
-        usuarioId: usuario.id,
-        accion: 'inicioSesion',
-        ip,
-        fecha: ahora,
-      }),
-    ]);
+    const idTexto = String(usuarioAutorizado.id);
 
-    return usuario;
+    await this.usuariosService.registrarUltimoAcceso(idTexto, ahora);
+
+    this.emisorEventos.emit('auditoria.acceso', {
+      usuarioId: usuarioAutorizado.id,
+      accion: 'inicioSesion',
+      recurso: 'sesion',
+      ip,
+      fecha: ahora,
+    });
+
+    return usuarioAutorizado;
   }
 
-  async registrarCierreSesion(usuarioId: string, ip: string): Promise<void> {
-    await this.auditoriaAcceso.registrarEventoAcceso({
+  registrarCierreSesion(usuarioId: string, ip: string): void {
+    this.emisorEventos.emit('auditoria.acceso', {
       usuarioId,
       accion: 'cierreSesion',
+      recurso: 'sesion',
       ip,
       fecha: new Date(),
     });

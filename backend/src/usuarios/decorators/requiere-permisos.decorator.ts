@@ -6,7 +6,7 @@ import {
 import type { Request } from 'express';
 import type { Permiso } from '../permisos';
 import type { UsuarioAutorizado } from '../usuarios.service';
-
+export * from '../../comun/autorizacion';
 export const CLAVE_PERMISOS = 'permisosRequeridos';
 export const CLAVE_PUBLICA = 'rutaPublica';
 

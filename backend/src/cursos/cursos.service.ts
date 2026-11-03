@@ -3,18 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Curso, CursoDocument } from './curso.schema';
 import { NIVELES, Nivel } from './niveles';
-
-export interface DatosCurso {
-  anio: number;
-  nivel: Nivel;
-  letra?: string | null;
-  asignaturaIds?: Types.ObjectId[];
-}
-
-export type ResultadoResolverCurso =
-  | { estado: 'encontrado'; curso: CursoDocument }
-  | { estado: 'noExiste' }
-  | { estado: 'ambiguo'; cursos: CursoDocument[] };
+import { DatosCurso } from './interfaces/datos-curso.interface';
+import { ResultadoResolverCurso } from './interfaces/resultado-resolver-curso.interface';
 
 @Injectable()
 export class CursosService {
