@@ -5,9 +5,11 @@ import { AlumnosModule } from './alumnos/alumnos.module';
 import { AsignaturasModule } from './asignaturas/asignaturas.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { AutenticacionModule } from './autenticacion/autenticacion.module';
+import { CargasModule } from './cargas/cargas.module';
 import { opcionesRedisDesdeUrl } from './configuracion/redis';
 import { VariablesEntorno } from './configuracion/validacion';
 import { CursosModule } from './cursos/cursos.module';
+import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -32,6 +34,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     AuditoriaModule,
     UsuariosModule,
     AutenticacionModule,
+    EvaluacionesModule,
+    CargasModule,
   ],
 })
 export class AppModule {}
