@@ -11,12 +11,13 @@ import type { UsuarioAutorizado } from '../comun/autorizacion';
 import { VariablesEntorno } from '../configuracion/validacion';
 import { Permiso, ROLES_INICIALES } from './permisos';
 import { RolesRepository } from './repositorios/roles.repository';
-import {
-  UsuariosRepository
-} from './repositorios/usuarios.repository';
+import { UsuariosRepository } from './repositorios/usuarios.repository';
 import { RolDocument } from './schemas/rol.schema';
 import { UsuarioDocument } from './schemas/usuario.schema';
-import { DatosActualizarUsuario, DatosCrearUsuario } from './interfaces/datos-usuario.interface';
+import {
+  DatosActualizarUsuario,
+  DatosCrearUsuario,
+} from './interfaces/datos-usuario.interface';
 
 export type { UsuarioAutorizado } from '../comun/autorizacion';
 export type DatosUsuario = DatosCrearUsuario;
@@ -32,10 +33,9 @@ export class UsuariosService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.asegurarRolesIniciales();
 
-    const correoDirectora = this.configuracion.get(
-      'CORREO_DIRECTORA_INICIAL',
-      { infer: true },
-    );
+    const correoDirectora = this.configuracion.get('CORREO_DIRECTORA_INICIAL', {
+      infer: true,
+    });
     if (correoDirectora) {
       await this.usuariosRepo.asegurarDirectoraInicial(correoDirectora);
     }
@@ -162,5 +162,4 @@ export class UsuariosService implements OnModuleInit {
   async registrarUltimoAcceso(id: string, fecha: Date): Promise<void> {
     await this.usuariosRepo.registrarUltimoAcceso(id, fecha);
   }
-
 }

@@ -1,5 +1,5 @@
 import { Nivel } from '../cursos/niveles';
-import { Area } from './asignatura.schema';
+//import { Area } from './asignatura.schema';
 import { AsignaturaCatalogo } from './interfaces/asignatura-catalogo.interface';
 
 const BASICA: Nivel[] = ['1', '2', '3', '4', '5', '6', '7', '8'];

@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import {
-  AuditoriaRepository,
-} from './auditoria.repository';
+import { AuditoriaRepository } from './auditoria.repository';
 import {
   RegistroAuditoria,
   RegistroAuditoriaSchema,
@@ -22,7 +20,6 @@ import { MongooseAuditoriaRepository } from './repositorios/mongoose-auditoria.r
       provide: AuditoriaRepository,
       useClass: MongooseAuditoriaRepository,
     },
-    
   ],
   exports: [AuditoriaRepository],
 })

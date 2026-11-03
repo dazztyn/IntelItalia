@@ -2,12 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PermisosGuard } from './guards/permisos.guard';
-import {
-  RolesRepository,
-} from './repositorios/roles.repository';
-import {
-  UsuariosRepository,
-} from './repositorios/usuarios.repository';
+import { RolesRepository } from './repositorios/roles.repository';
+import { UsuariosRepository } from './repositorios/usuarios.repository';
 import { Rol, RolSchema } from './schemas/rol.schema';
 import { Usuario, UsuarioSchema } from './schemas/usuario.schema';
 import { UsuariosController } from './usuarios.controller';

@@ -1,7 +1,6 @@
-import { Types } from "mongoose";
+import { Types } from 'mongoose';
 
-export interface NuevoRegistroAuditoria 
-{
+export interface NuevoRegistroAuditoria {
   usuarioId?: Types.ObjectId | string | null;
   accion: string;
   recurso: string;

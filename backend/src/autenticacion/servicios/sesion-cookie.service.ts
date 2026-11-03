@@ -29,11 +29,7 @@ export class SesionCookieService implements ExtractorSesionHttp {
     payload: PayloadJwt,
   ): Promise<void> {
     const token = await this.jwtService.signAsync(payload);
-    respuesta.cookie(
-      NOMBRE_COOKIE_SESION,
-      token,
-      this.obtenerOpcionesCookie(),
-    );
+    respuesta.cookie(NOMBRE_COOKIE_SESION, token, this.obtenerOpcionesCookie());
   }
 
   limpiarCookieSesion(respuesta: Response): void {
