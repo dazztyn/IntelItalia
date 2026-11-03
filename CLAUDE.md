@@ -69,11 +69,29 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 - El `docente` sube notas y asistencia, ve la ficha y las alertas, y registra observaciones (no psicosociales ni PIE), siempre solo de sus cursos.
 - Cada endpoint exige su permiso con `@RequierePermisos('…')`.
 
+**Implementación (backend):**
+
+- El catálogo de permisos y los roles iniciales están en `backend/src/usuarios/permisos.ts`. Hoy existen `directora` (siempre con todos los permisos: los recupera al iniciar la API) y `docente`; faltan los otros 7 roles.
+- Decoradores y tipos en `backend/src/comun/autorizacion.ts`: `@RequierePermisos(...)`, `@Publica()`, `@SoloAutenticado()`, `@UsuarioActual()`, `UsuarioAutorizado` y `SolicitudAutorizada`. No crear copias en otros módulos.
+- El guard global (`usuarios/guards/permisos.guard.ts`) **deniega por defecto**: una ruta sin `@RequierePermisos`, `@Publica` ni `@SoloAutenticado` responde 403. Sin sesión, o con un usuario inactivo, responde 401.
+- Filtro por curso en los servicios con `cursosPermitidos(usuario)` y `tieneAccesoACurso(usuario, cursoId)` (`usuarios/alcance.ts`).
+
 ### Autenticación
 
 - Login con Google: el backend verifica el ID token.
 - **Lista blanca:** solo pueden entrar los correos registrados en `usuarios`.
 - Sesión con JWT en cookie httpOnly.
+
+**Implementación (backend):**
+
+- `POST /api/autenticacion/google` recibe `{ idToken }` (del botón de Google Identity Services) y deja la sesión en la cookie `intelitalia_sesion`. También existen `GET /api/autenticacion/perfil` y `POST /api/autenticacion/salir`.
+- Variables: `GOOGLE_CLIENT_ID` y `JWT_SECRETO` (obligatorias), `DOMINIO_GOOGLE_PERMITIDO` (vacío = cualquier cuenta de Google; con dominio = solo ese Google Workspace) y `CORREO_DIRECTORA_INICIAL` (crea el primer usuario). Ver `.env.example`.
+- ⏳ El frontend todavía no está conectado: el botón de login y la sesión del `SessionProvider` son simulados.
+
+### Auditoría
+
+- Se registra emitiendo el evento `auditoria.acceso` con `EventEmitter2`; `AuditoriaListener` lo guarda en `registroAuditoria`. Solo identificadores (`usuarioId`, `alumnoId`, `recursoId`), nunca RUT, nombres ni notas.
+- Hoy se registran el inicio de sesión, el cierre y el acceso denegado al login. ⏳ Faltan los accesos a fichas, las cargas, las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
 
 ## Stack y estructura
 
@@ -86,6 +104,17 @@ Monorepo sin `package.json` raíz: cada carpeta se instala y ejecuta por separad
 | `docs/` | Documentación del proyecto |
 
 Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para desarrollo). **El hosting está por definir** (servidor de la escuela, servidor nacional o PaaS externo; ver sección 8.5 del documento). No usar servicios propios de un proveedor: todo se configura por variables de entorno. MongoDB y Redis nunca quedan expuestos a internet.
+
+### Estado actual (actualizar al mergear cada tarea)
+
+| Área | Implementado en `master` | Pendiente |
+|------|--------------------------|-----------|
+| Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43) | — |
+| Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
+| Lectura | `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (PGT-56/57) | Ficha del alumno (`GET /api/alumnos/:id`, con auditoría) |
+| Cargas | — | Todo el módulo (sección 6). DIA ya tiene formato conocido; Mi Aula y SEPA, bloqueados por el formato |
+| Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
+| Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
 
 ## Comandos
 
@@ -120,6 +149,13 @@ npm run build         # tsc -b && vite build
 ```
 
 Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la carpeta modificada. El CI (`.github/workflows/ci.yml`) corre lo mismo en cada pull request.
+
+**Notas para no romper el CI:**
+
+- **Dependencias:** instalar con `npm install` (nunca editar `package.json` a mano) y commitear `package.json` y `package-lock.json` juntos, porque el CI usa `npm ci`. Usar versiones compatibles con **NestJS 11**: las últimas de algunos paquetes `@nestjs/*` (p. ej. `@nestjs/jwt` o `@nestjs/event-emitter`) son para NestJS 12 y rompen los tests de Jest.
+- **Variables nuevas:** agregarlas en `configuracion/validacion.ts`, `.env.example`, `docker-compose.yml` (servicio `api`) y `test/entorno-global.ts`. Si falta en el último, fallan todos los e2e.
+- **Tests e2e con sesión:** simular la sesión con un middleware que solo existe en el test y llena `request.sesion` (ver `test/cursos.e2e-spec.ts`). Nunca agregar un "login falso" a la API.
+- **VS Code:** usar el TypeScript del backend (`.vscode/settings.json`). El que trae VS Code (6.x) activa `strict` y marca errores que el build no tiene.
 
 ## Convenciones de código
 
