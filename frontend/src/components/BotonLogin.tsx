@@ -1,18 +1,18 @@
-import LogoGoogle  from '../assets/GOOGLEICON.svg'
+import { GoogleLogin } from '@react-oauth/google'
 
 interface Props {
-  onClick: () => void
+  onToken: (idToken: string) => void
+  onError: () => void
 }
 
-export function BotonGoogle({ onClick }: Props) {
+export function BotonGoogle({ onToken, onError }: Props) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex w-full max-w-xs items-center justify-center gap-3 rounded-md border border-white bg-[#CD212A] px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-red-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-600"
-    >
-      <img src={LogoGoogle} alt="Logo Google" className="h-[18px] w-[18px]" />
-      Ingresar con Google
-    </button>
+    <GoogleLogin
+      onSuccess={({ credential }) => (credential ? onToken(credential) : onError())}
+      onError={onError}
+      theme="outline"
+      shape="pill"
+      text="signin_with"
+    />
   )
 }

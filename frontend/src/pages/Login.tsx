@@ -1,15 +1,16 @@
-import { Navigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { Footer } from '../components/Footer'
 import { PanelFoto } from '../components/PanelFoto'
 import { PanelLogin } from '../components/PanelLogin'
 import { useSesion } from '../hooks/useSession'
 
 export function Login() {
-  const { usuario } = useSesion()
+  const { usuario, cargando } = useSesion()
+  const location = useLocation()
+  const destino = (location.state as { desde?: string } | null)?.desde ?? '/'
 
-  if (usuario) {
-    return <Navigate to="/cursos" replace />
-  }
+  if (cargando) return null
+  if (usuario) return <Navigate to={destino} replace />
 
   return (
     <div className="flex min-h-svh flex-col">
