@@ -3,27 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { normalizarRut } from '../comun/rut';
 import { claveNombre } from '../comun/texto';
-import {
-  Alumno,
-  AlumnoDocument,
-  DatosPie,
-  EstadoMatricula,
-} from './alumno.schema';
-
-export interface DatosAlumno {
-  rut?: string | null;
-  ipe?: string | null;
-  nombres: string;
-  apellidoPaterno: string;
-  apellidoMaterno?: string | null;
-  fechaNacimiento?: Date | null;
-  matriculas?: Array<{
-    anio: number;
-    cursoId: Types.ObjectId;
-    estado?: EstadoMatricula;
-  }>;
-  pie?: DatosPie;
-}
+import { Alumno, AlumnoDocument, DatosPie } from './alumno.schema';
+import { DatosAlumno } from './interfaces/datos-alumno.interface';
 
 @Injectable()
 export class AlumnosService {
