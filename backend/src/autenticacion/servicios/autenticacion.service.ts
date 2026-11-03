@@ -26,7 +26,7 @@ export class AutenticacionService {
 
     if (!usuarioAutorizado) {
       this.emisorEventos.emit('auditoria.acceso', {
-        usuarioId: null, 
+        usuarioId: null,
         accion: 'accesoDenegado',
         recurso: 'sesion',
         ip,
@@ -53,7 +53,7 @@ export class AutenticacionService {
     return usuarioAutorizado;
   }
 
-  async registrarCierreSesion(usuarioId: string, ip: string): Promise<void> {
+  registrarCierreSesion(usuarioId: string, ip: string): void {
     this.emisorEventos.emit('auditoria.acceso', {
       usuarioId,
       accion: 'cierreSesion',

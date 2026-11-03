@@ -59,16 +59,13 @@ export class AutenticacionController {
   @SoloAutenticado()
   @Post('salir')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async cerrarSesion(
+  cerrarSesion(
     @UsuarioActual() usuario: UsuarioAutorizado,
     @Req() peticion: Request,
     @Res({ passthrough: true }) respuesta: Response,
-  ): Promise<void> {
+  ): void {
     const ip = peticion.ip || 'desconocida';
     this.sesionCookieService.limpiarCookieSesion(respuesta);
-    await this.autenticacionService.registrarCierreSesion(
-      String(usuario.id),
-      ip,
-    );
+    this.autenticacionService.registrarCierreSesion(String(usuario.id), ip);
   }
 }
