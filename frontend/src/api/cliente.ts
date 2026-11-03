@@ -7,12 +7,15 @@ export class ErrorApi extends Error {
     this.estado = estado
   }
 }
-
 export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+  const esFormulario = opciones.body instanceof FormData
+
   const respuesta = await fetch(`/api${ruta}`, {
     ...opciones,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...opciones.headers },
+    headers: esFormulario
+      ? opciones.headers
+      : { 'Content-Type': 'application/json', ...opciones.headers },
   })
 
   if (!respuesta.ok) {
@@ -23,11 +26,12 @@ export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promis
 }
 
 async function leerMensajeError(respuesta: Response): Promise<string> {
-  try {
-    const cuerpo = (await respuesta.json()) as { message?: string | string[] }
-    if (Array.isArray(cuerpo.message)) return cuerpo.message.join('. ')
-    if (cuerpo.message) return cuerpo.message
-  } catch {
-  }
+  const cuerpo = (await respuesta.json().catch(() => null)) as {
+    message?: string | string[]
+  } | null
+  const mensaje = cuerpo?.message
+
+  if (Array.isArray(mensaje)) return mensaje.join('. ')
+  if (mensaje) return mensaje
   return `Error ${respuesta.status}`
 }
