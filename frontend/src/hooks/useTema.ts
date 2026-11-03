@@ -14,6 +14,14 @@ function suscribir(aviso: () => void) {
 function esOscuro(): boolean {
   return document.documentElement.classList.contains('dark')
 }
+function guardarTema(oscuro: boolean): boolean {
+  try {
+    localStorage.setItem(CLAVE_TEMA, oscuro ? 'oscuro' : 'claro')
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function useTema() {
   const oscuro = useSyncExternalStore(suscribir, esOscuro, () => false)
@@ -21,10 +29,7 @@ export function useTema() {
   function alternar() {
     const siguiente = !esOscuro()
     document.documentElement.classList.toggle('dark', siguiente)
-    try {
-      localStorage.setItem(CLAVE_TEMA, siguiente ? 'oscuro' : 'claro')
-    } catch {
-    }
+    guardarTema(siguiente)
   }
 
   return { oscuro, alternar }
