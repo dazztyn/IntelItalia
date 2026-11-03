@@ -336,6 +336,7 @@ Ejemplos con los campos reales de cada instrumento (ver [sección 4.4](#44-forma
 ```
 
 - **Tipos de normalización:** `mapa` (categoría → nivel), `rangos` (número → nivel) y `estandarNivel` (posición respecto de la categoría esperada para el nivel del alumno). Cada instrumento usa **su propio criterio**; el catálogo solo dice cómo traducirlo a la escala común.
+- **Implementación (PGT-54):** colección y servicio en `backend/src/evaluaciones/`. Por ahora el catálogo solo trae `DIA` (`tipos-iniciales.ts`), que se crea al iniciar la API si no existe, como los roles. Su `reglaNormalizacion` tiene `rangos: []` hasta que la escuela defina los cortes (⏳). Letrapps y SEPA se agregan con su carga.
 
 ### 3.7 `resultadosEvaluacion`
 
@@ -357,6 +358,7 @@ Ejemplos con los campos reales de cada instrumento (ver [sección 4.4](#44-forma
 ```
 
 - **Índice único:** `{ alumnoId, tipoEvaluacionId, anio, momento, area }`.
+- **Implementación (PGT-54):** `EvaluacionesService.guardarResultado` hace un upsert por el índice único, así que recargar un archivo actualiza en vez de duplicar. Mientras no haya cortes, el DIA se guarda con `nivelNormalizado: null` ("sin clasificar"): no genera alertas, y la ficha muestra los porcentajes.
 
 ### 3.8 `resultadosSimce`
 
@@ -701,6 +703,58 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
 - **Idempotencia:** se usan upserts sobre las claves únicas (sección 3). Cargar dos veces el mismo archivo no duplica datos.
 - **Minimización:** solo se leen las columnas mapeadas y el resto se descarta. El archivo original se elimina después de procesarlo.
 - **Trazabilidad:** cada dato guarda el `cargaId` que lo originó.
+
+### 6.2.1 Implementación de la carga del DIA (PGT-54)
+
+Código en `backend/src/cargas/`. El lector del archivo es `parsers/dia.parser.ts`: busca las filas por su texto ("Curso", "Fecha de descarga", "Nombre del Estudiante") y no por número fijo.
+
+**Desviaciones del flujo de la sección 6.1, aceptadas para la presentación:**
+
+- **Se procesa dentro de la petición, sin BullMQ**: un DIA trae unas 25 filas. Cuando lleguen archivos grandes (Mi Aula de toda la escuela), el mismo servicio pasa a la cola `procesarCarga`.
+- **El archivo se procesa en memoria** y nunca se escribe en disco, así que no hay archivo temporal que borrar. La vista previa y la confirmación reciben el mismo archivo: el servidor no guarda nada entre una y otra.
+- ⏳ **Todavía no se guardan los alias de nombres** que el usuario elige en la vista previa (sección 6.2): en cada carga se vuelven a resolver.
+- El permiso es `cargas.evaluaciones` para todo, porque la única fuente es el DIA.
+
+**Contrato para el frontend** (todo con la cookie de sesión). Los `POST` son `multipart/form-data`:
+
+| Endpoint | Recibe | Responde |
+|----------|--------|----------|
+| `POST /api/cargas/vista-previa` | `archivo` (.xlsx, máx. 5 MB), `fuente=dia`, `momento` (`diagnostico` \| `monitoreo` \| `cierre`) | 200 con la vista previa (abajo). **No guarda nada** |
+| `POST /api/cargas` | lo mismo + `resoluciones` (opcional, JSON como texto) | 201 con la carga: `{ id, fuente, nombreArchivo, cursoId, anio, momento, area, estado, filasTotales, filasOk, errores: [{ fila, campo, mensaje }], iniciadaEn, finalizadaEn }` |
+| `GET /api/cargas` | — | Las últimas 50 cargas, como arriba pero sin `errores` |
+| `GET /api/cargas/:id` | — | Una carga con sus `errores` |
+
+Vista previa:
+
+```json
+{
+  "curso": { "id": "…", "nombre": "3° Básico" },
+  "anio": 2026, "area": "lenguaje", "momento": "diagnostico",
+  "ejes": ["localizar", "interpretarRelacionar", "reflexionar"],
+  "filas": [{
+    "fila": 14, "numeroLista": 1, "nombre": "PÉREZ SOTO ANA MARÍA",
+    "estado": "encontrado",
+    "alumnoId": "…",
+    "candidatos": [{ "id": "…", "nombreCompleto": "Ana María Pérez Soto" }],
+    "porcentajesPorEje": { "localizar": 55.5, "interpretarRelacionar": 70, "reflexionar": 20 },
+    "porcentajeLogro": 48.5
+  }]
+}
+```
+
+- **`estado` de cada fila:**
+  - `encontrado`: un solo alumno coincide;
+  - `ambiguo`: varios coinciden, y están en `candidatos`;
+  - `noEncontrado`: nadie coincide. El frontend ofrece los alumnos del curso con `GET /api/cursos/:id/alumnos`;
+  - `sinResultado`: el alumno no rindió. No se guarda nada, nunca 0%;
+  - `error`: porcentajes inválidos o incompletos, explicado en `mensaje`. Ese campo solo viene en las filas con error.
+- **`resoluciones`:** `{ "<fila>": "<alumnoId>" | null }`, solo para las filas dudosas. `null` descarta la fila. El alumno elegido tiene que estar matriculado en el curso. Una fila `ambiguo` o `noEncontrado` sin resolver queda como error de la carga.
+- **`estado` de la carga:** `completada` (sin errores), `completadaConErrores` o `fallida` (no se guardó ninguna fila).
+- **Errores de la petición:**
+  - 400: falta el archivo, no es `.xlsx`, `fuente` o `momento` no son válidos, el archivo no tiene el formato del DIA, el curso no existe ese año o las `resoluciones` están mal formadas;
+  - 403: falta el permiso o el curso está fuera del alcance;
+  - 413: el archivo supera 5 MB.
+- **Auditoría:** cada carga confirmada registra `carga.crear`.
 
 ### 6.3 Ingreso manual
 

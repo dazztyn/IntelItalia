@@ -112,7 +112,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (PGT-56/57) | Ficha del alumno (`GET /api/alumnos/:id`, con auditoría) |
-| Cargas | — | Todo el módulo (sección 6). DIA ya tiene formato conocido; Mi Aula y SEPA, bloqueados por el formato |
+| Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
 
