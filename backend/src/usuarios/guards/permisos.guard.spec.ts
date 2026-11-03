@@ -5,13 +5,15 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Types } from 'mongoose';
-import { PermisosGuard } from './permisos.guard';
 import {
   Publica,
   RequierePermisos,
+  SoloAutenticado,
   SolicitudAutorizada,
-} from '../decorators/requiere-permisos.decorator';
-import { UsuarioAutorizado, UsuariosService } from '../usuarios.service';
+  UsuarioAutorizado,
+} from '../../comun/autorizacion';
+import { UsuariosService } from '../usuarios.service';
+import { PermisosGuard } from './permisos.guard';
 
 class ControladorDePrueba {
   @Publica()
@@ -22,6 +24,9 @@ class ControladorDePrueba {
 
   @RequierePermisos('usuarios.gestionar')
   gestionarUsuarios() {}
+
+  @SoloAutenticado()
+  perfil() {}
 
   sinDecorador() {}
 }
@@ -41,6 +46,8 @@ function contexto(
 describe('PermisosGuard', () => {
   const docente: UsuarioAutorizado = {
     id: new Types.ObjectId(),
+    correo: 'docente.ficticio@ejemplo.cl',
+    nombre: 'Docente Ficticio',
     rol: 'docente',
     alcance: 'cursosAsignados',
     permisos: ['cargas.notas', 'cargas.asistencia', 'observaciones.crear'],
@@ -93,6 +100,15 @@ describe('PermisosGuard', () => {
     await expect(
       guard.canActivate(contexto('sinDecorador', conSesion())),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('con @SoloAutenticado basta la sesión, sin permisos', async () => {
+    await expect(
+      guard.canActivate(contexto('perfil', conSesion())),
+    ).resolves.toBe(true);
+    await expect(
+      guard.canActivate(contexto('perfil', {} as SolicitudAutorizada)),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it('con el permiso deja pasar y deja el usuario en la solicitud', async () => {

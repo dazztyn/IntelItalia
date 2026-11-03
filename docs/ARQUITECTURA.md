@@ -778,12 +778,12 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 |---------|-----|
 | `backend/src/usuarios/permisos.ts` | Catálogo `PERMISOS` (la tabla de arriba) y `ROLES_INICIALES` |
 | `backend/src/usuarios/guards/permisos.guard.ts` | Guard global (`APP_GUARD`) |
-| `backend/src/usuarios/decorators/requiere-permisos.decorator.ts` | `@RequierePermisos(...)`, `@Publica()` y `@UsuarioActual()` |
+| `backend/src/comun/autorizacion.ts` | `@RequierePermisos(...)`, `@Publica()`, `@SoloAutenticado()`, `@UsuarioActual()` y los tipos `UsuarioAutorizado` y `SolicitudAutorizada` |
 | `backend/src/usuarios/alcance.ts` | Filtro por curso para los servicios (sección 7.4) |
 
-- **Sesión:** el guard lee `request.sesion = { usuarioId }`, que llena el login (PGT-6) a partir del JWT. En cada request carga de la base el usuario y su rol, así que desactivar a alguien o cambiar sus permisos tiene efecto inmediato.
+- **Sesión:** el guard lee `request.sesion = { usuarioId }`. Si no viene, la obtiene de la cookie de sesión (JWT) con `SesionCookieService` (PGT-6). En cada request carga de la base el usuario y su rol, así que desactivar a alguien o cambiar sus permisos tiene efecto inmediato.
 - **Respuestas:** sin sesión, o con un usuario inexistente o inactivo, responde **401**. Si falta un permiso, responde **403**.
-- **Se deniega por defecto:** una ruta sin `@RequierePermisos` responde 403. Las rutas sin sesión (salud y, más adelante, el login) se marcan con `@Publica()`.
+- **Se deniega por defecto:** una ruta sin `@RequierePermisos` responde 403. Las rutas sin sesión (salud y el login) se marcan con `@Publica()`, y las que solo exigen haber iniciado sesión (perfil, salir) con `@SoloAutenticado()`.
 - **Roles iniciales:** se crean al iniciar la API si no existen, también en producción. Los ya existentes no se modifican, para no pisar lo que edite la Directora.
 - `usuarios.rol` guarda el **código** del rol (p. ej. `"docente"`).
 - Por ahora existen los roles `directora` y `docente`, con los permisos de la tabla. ⏳ Faltan los demás roles.
