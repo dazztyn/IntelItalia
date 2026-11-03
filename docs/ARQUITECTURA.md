@@ -215,6 +215,8 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
   - Si el nivel tiene **un solo curso**, la fila se asigna a ese curso, **traiga o no letra el archivo**. Esto importa porque los instrumentos externos escriben una letra aunque la escuela no la use: Letrapps pone "3° Básico A" y el DIA, "3 A".
   - Si el nivel tiene **más de un curso**, la letra del archivo tiene que coincidir con la de un curso. Si el archivo no trae letra o la letra no existe, la fila se marca como **error que hay que resolver**.
   - Cada parser traduce el formato de curso de su fuente ("3° Básico A", "3 A", "3°B") a nivel + letra.
+  - ⏳ **Ajuste pendiente:** si el único curso del nivel **tiene letra** (p. ej. solo existe 5° A) y el archivo trae otra (5° B), la fila no debe asignarse: es un curso que no existe. Hoy se asigna igual. Ver "Pendientes acordados" en `CLAUDE.md`.
+- ⏳ **Creación de cursos:** hoy solo los crea la semilla de datos ficticios. Falta que la Directora defina los cursos que se imparten cada año (ver "Pendientes acordados" en `CLAUDE.md`).
 - **Cuando la escuela empiece a usar letras:** se crean los cursos del año nuevo con su letra (p. ej. 3° A y 3° B). Los cursos de años anteriores, con `letra: null`, no cambian, así que el historial se mantiene.
 - **Implementación (PGT-56/57):** dos endpoints de lectura, ambos con `@RequierePermisos('alumnos.ver')` y el alcance por curso de la [sección 7.4](#74-alcance-por-curso):
 

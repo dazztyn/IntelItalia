@@ -116,6 +116,23 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
 
+### Pendientes acordados (implementar después)
+
+Ajustes ya conversados con el equipo que todavía no están en el código. Al implementar uno, borrarlo de esta lista y actualizar `docs/ARQUITECTURA.md`.
+
+1. **Curso con letra al cargar archivos** (`CursosService.resolverCurso`). Hoy, si el nivel tiene un solo curso, la fila se asigna a ese curso **traiga la letra que traiga** el archivo. Eso sirve mientras la escuela no use letras (`letra: null`), pero si solo existe **5°A** y el archivo dice **5°B**, los datos se cargan en 5°A sin aviso. Regla correcta:
+   - el único curso del nivel tiene `letra: null` → se acepta cualquier letra (como hoy);
+   - el único curso tiene letra y el archivo trae **otra** → `noExiste` ("No existe el curso 5° Básico B");
+   - el archivo no trae letra y hay un solo curso → se asigna.
+
+   Agregar un test por caso y corregir la regla en la sección 3.2. Afecta a todas las cargas (DIA y Mi Aula).
+2. **Cursos (niveles) que se imparten cada año.** Hoy los cursos **solo los crea `npm run semilla`**, que no se corre en producción: con el sistema instalado, `cursos` estaría vacía y ninguna carga funcionaría. Hace falta:
+   - `POST /api/cursos` para que la Directora cree un curso del año (`{ anio, nivel, letra? }`), con las asignaturas del catálogo según el nivel, como hace la semilla (`CursosService.crear` ya existe);
+   - opcionalmente, `POST /api/cursos/preparar-anio` para crear de una vez los cursos estándar (PK a 8°) de un año;
+   - las cargas y la asignación de cursos a docentes ya rechazan cursos que no existen, así que la lista de cursos creados funciona como el límite de lo que se puede cargar. Opcional: exigir que el curso tenga alumnos matriculados (la nómina cargada) antes de aceptar notas o asistencia.
+
+   Si más adelante se crea la entidad de **año académico** (año vigente, semestres, cierre), los cursos a impartir pasan a ser parte de "preparar el año".
+
 ## Comandos
 
 ```bash
