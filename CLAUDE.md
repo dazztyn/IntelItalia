@@ -86,7 +86,8 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 
 - `POST /api/autenticacion/google` recibe `{ idToken }` (del botón de Google Identity Services) y deja la sesión en la cookie `intelitalia_sesion`. También existen `GET /api/autenticacion/perfil` y `POST /api/autenticacion/salir`.
 - Variables: `GOOGLE_CLIENT_ID` y `JWT_SECRETO` (obligatorias), `DOMINIO_GOOGLE_PERMITIDO` (vacío = cualquier cuenta de Google; con dominio = solo ese Google Workspace) y `CORREO_DIRECTORA_INICIAL` (crea el primer usuario). Ver `.env.example`.
-- ⏳ El frontend todavía no está conectado: el botón de login y la sesión del `SessionProvider` son simulados.
+- **Frontend:** el botón de Google (`@react-oauth/google`) envía el `idToken` al backend. `SessionProvider` consulta `/perfil` al abrir la app (un 401 ahí es normal: significa que no hay sesión), y `RutaProtegida` redirige a `/ingresar` sin sesión. Necesita `VITE_GOOGLE_CLIENT_ID` en `frontend/.env` (Vite no lee el `.env` de la raíz), y el Client ID debe tener `http://localhost:5173` en sus orígenes autorizados.
+- ⏳ En Docker, `VITE_GOOGLE_CLIENT_ID` todavía no se le pasa al build del servicio `web`.
 
 ### Auditoría
 
@@ -114,7 +115,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
 | Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
-| Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
+| Frontend | Login con Google conectado al backend, sesión real, rutas protegidas y página de inicio | Vistas de cursos, ficha y carga del DIA (contratos en las secciones 6.2.1 y 9.1); dashboard y administración |
 
 ### Pendientes acordados (implementar después)
 
@@ -156,6 +157,7 @@ npm test              # tests unitarios (Jest)
 npm run test:e2e      # tests e2e (MongoDB en memoria; o MONGO_URI_E2E=… para usar uno existente)
 npm run build
 npm run semilla       # carga datos FICTICIOS (asignaturas, cursos PK–8° y alumnos) en el MONGO_URI de .env; nunca en producción
+npm run dia-ficticio -- 3 lenguaje 2026   # genera un DIA FICTICIO (.xlsx) con los alumnos de la semilla en backend/archivos-ficticios/ (no se sube)
 
 # Frontend
 cd frontend
