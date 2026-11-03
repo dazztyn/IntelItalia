@@ -29,5 +29,9 @@ export const esquemaVariablesEntorno = Joi.object<VariablesEntorno>({
   DOMINIO_GOOGLE_PERMITIDO: Joi.string().trim().allow('').optional(),
   JWT_SECRETO: Joi.string().min(32).required(),
   JWT_DURACION_SEGUNDOS: Joi.number().integer().positive().default(36000),
-  CORREO_DIRECTORA_INICIAL: Joi.string().email().lowercase().optional(),
+  CORREO_DIRECTORA_INICIAL: Joi.string()
+    .email()
+    .lowercase()
+    .allow('')
+    .optional(),
 });

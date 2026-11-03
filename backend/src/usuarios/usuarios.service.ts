@@ -95,6 +95,10 @@ export class UsuariosService implements OnModuleInit {
       );
     }
 
+    if (datos.rol && usuarioActualId && String(usuarioActualId) === id) {
+      throw new BadRequestException('No puede cambiar su propio rol');
+    }
+
     const actualizado = await this.usuariosRepo.actualizar(id, datos);
     if (!actualizado) {
       throw new NotFoundException('El usuario no existe');

@@ -163,5 +163,21 @@ describe('Usuarios y roles (e2e)', () => {
         }),
       ).rejects.toThrow('duplicate key');
     });
+
+    it('no permite que un usuario se cambie su propio rol', async () => {
+      const directora = await usuarios.crear({
+        correo: 'otra.directora@ejemplo.cl',
+        nombre: 'Otra Directora',
+        rol: 'directora',
+      });
+      const id = String(directora._id);
+
+      await expect(
+        usuarios.actualizarUsuario(id, { rol: 'docente' }, directora._id),
+      ).rejects.toThrow('No puede cambiar su propio rol');
+
+      const autorizada = await usuarios.obtenerUsuarioAutorizado(id);
+      expect(autorizada?.rol).toBe('directora');
+    });
   });
 });
