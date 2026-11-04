@@ -133,6 +133,34 @@ Ajustes ya conversados con el equipo que todavía no están en el código. Al im
    - las cargas y la asignación de cursos a docentes ya rechazan cursos que no existen, así que la lista de cursos creados funciona como el límite de lo que se puede cargar. Opcional: exigir que el curso tenga alumnos matriculados (la nómina cargada) antes de aceptar notas o asistencia.
 
    Si más adelante se crea la entidad de **año académico** (año vigente, semestres, cierre), los cursos a impartir pasan a ser parte de "preparar el año".
+3. **Resultados de evaluaciones por curso:** `GET /api/cursos/:id/evaluaciones?anio=` (con `alumnos.ver` y alcance), para la tabla del curso con los % del DIA de cada alumno. Hoy solo están en la ficha, alumno por alumno, y pedir 20 fichas dejaría 20 registros `ficha.ver` en la auditoría.
+4. **Búsqueda de alumnos por RUT, IPE o nombre:** `POST /api/alumnos/busqueda` con `{ texto }`. Es `POST` para que el RUT no quede en la URL ni en los logs del proxy. Un docente solo encuentra alumnos de sus cursos, y una búsqueda fuera de su alcance devuelve una lista vacía (no un 403). `AlumnosService.buscarPorRut` y `buscarPorIpe` ya existen.
+5. **Documentación de la API:** la sección 7.1 de `ARQUITECTURA.md` todavía exige el claim `hd` (ahora `DOMINIO_GOOGLE_PERMITIDO` es opcional) y no documenta qué devuelve `/perfil`. Los endpoints de `/api/usuarios` no están documentados. Conviene una sección "Referencia de la API" con todos los endpoints.
+6. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
+7. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
+8. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
+
+### Tareas para la presentación (noviembre 2026)
+
+Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA ficticio → resolver las filas dudosas → ver la ficha del alumno con su resultado. Todo con datos ficticios.
+
+**Backend (hecho):** login, cursos, alumnos por curso, carga del DIA y ficha. Probado de punta a punta con un login real desde la consola del navegador.
+
+**Pendiente:**
+
+| # | Tarea | Quién | Depende de |
+|---|-------|-------|------------|
+| 1 | Mergear `dia-ficticio-demo` (script `npm run dia-ficticio` y este CLAUDE.md) | Equipo | — |
+| 2 | Mergear `progreso-front` (esqueleto de la pantalla principal) y reemplazar sus datos de ejemplo (`frontend/src/datos/ejemplo.ts`) por la API | Frontend | — |
+| 3 | Vista de curso `/cursos/:id`: `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (sección 3.2) | Frontend | — |
+| 4 | Ficha `/alumnos/:id` (sección 9.1): datos, matrículas, tarjetas del DIA; notas y asistencia como "pendiente de Mi Aula" | Frontend | — |
+| 5 | Pantalla de carga `/cargas` (sección 6.2.1): archivo y momento → vista previa → elegir alumno en las filas dudosas → confirmar → resumen e historial. Subir con `FormData` **sin** el `Content-Type: application/json` que agrega `pedir()` | Frontend | — |
+| 6 | Endpoint de resultados por curso (pendiente 3) para mostrar los % del DIA en la vista de curso | Backend | Opcional para la demo |
+| 7 | Referencia de la API (pendiente 5), para que el frontend tenga un solo lugar donde mirar | Backend | — |
+| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | 1 a 5 |
+
+**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 1, 2, 4, 6 y 8.
+
 
 ## Comandos
 
@@ -168,6 +196,16 @@ npm run build         # tsc -b && vite build
 ```
 
 Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la carpeta modificada. El CI (`.github/workflows/ci.yml`) corre lo mismo en cada pull request.
+
+**Puesta en marcha en un equipo nuevo (desarrollo):**
+
+1. `cp .env.example .env` en la raíz y completar **todas** las secciones. `JWT_SECRETO` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, y `CORREO_DIRECTORA_INICIAL` con el correo de quien va a entrar.
+2. `frontend/.env` con `VITE_GOOGLE_CLIENT_ID=<el mismo Client ID>`. En Google Cloud, el Client ID tiene que tener `http://localhost:5173` en "Orígenes autorizados de JavaScript".
+3. Abrir Docker Desktop y levantar Mongo y Redis (comando de arriba). Si falla con "ports are not available … 27017", hay un **MongoDB instalado en Windows** ocupando el puerto: detenerlo con `Stop-Service MongoDB` (PowerShell como administrador).
+4. `npm ci` en `backend/` y en `frontend/`.
+5. `npm run semilla -- 2026` y después `npm run dia-ficticio -- 3 lenguaje 2026`. **El año tiene que ser el mismo**, porque el DIA trae el año en la fecha de descarga.
+6. `npm run start:dev` (backend) y `npm run dev` (frontend). Entrar a `http://localhost:5173` con el correo de `CORREO_DIRECTORA_INICIAL`.
+7. Si `crear-usuario-app.js` no creó el usuario de Mongo (por ejemplo, porque se cambió `MONGO_CLAVE_APP` después de crear el volumen), recrear el volumen con `docker compose down -v`, lo que borra los datos locales, y volver a correr la semilla.
 
 **Notas para no romper el CI:**
 
