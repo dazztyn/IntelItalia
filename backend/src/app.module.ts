@@ -10,6 +10,7 @@ import { opcionesRedisDesdeUrl } from './configuracion/redis';
 import { VariablesEntorno } from './configuracion/validacion';
 import { CursosModule } from './cursos/cursos.module';
 import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
+import { FichasModule } from './fichas/fichas.module';
 import { NucleoModule } from './nucleo.module';
 import { SaludModule } from './salud/salud.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -36,6 +37,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     AutenticacionModule,
     EvaluacionesModule,
     CargasModule,
+    FichasModule,
   ],
 })
 export class AppModule {}

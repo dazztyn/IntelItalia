@@ -91,7 +91,7 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 ### Auditoría
 
 - Se registra emitiendo el evento `auditoria.acceso` con `EventEmitter2`; `AuditoriaListener` lo guarda en `registroAuditoria`. Solo identificadores (`usuarioId`, `alumnoId`, `recursoId`), nunca RUT, nombres ni notas.
-- Hoy se registran el inicio de sesión, el cierre y el acceso denegado al login. ⏳ Faltan los accesos a fichas, las cargas, las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
+- Hoy se registran el inicio de sesión, el cierre, el acceso denegado al login, cada carga (`carga.crear`), cada ficha vista (`ficha.ver`) y cada ficha fuera del alcance (`accesoDenegado`). ⏳ Faltan las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
 
 ## Stack y estructura
 
@@ -111,7 +111,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 |------|--------------------------|-----------|
 | Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
-| Lectura | `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (PGT-56/57) | Ficha del alumno (`GET /api/alumnos/:id`, con auditoría) |
+| Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
 | Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
