@@ -14,11 +14,7 @@ const OPCIONES: OpcionMenu[] = [
   { texto: 'Vista general', ruta: '/' },
   // ⏳ Confirmar con el equipo qué permiso corresponde a la carga de cursos.
   { texto: 'Carga de cursos', ruta: null, permisos: ['cargas.notas'] },
-  {
-    texto: 'Carga de evaluaciones y asistencia',
-    ruta: null,
-    permisos: ['cargas.evaluaciones', 'cargas.asistencia'],
-  },
+  { texto: 'Carga de evaluaciones y asistencia', ruta: '/cargas', permisos: ['cargas.evaluaciones'] },
   { texto: 'Vista de alertas', ruta: null, permisos: ['alertas.ver'] },
   { texto: 'Administrar usuarios', ruta: null, permisos: ['usuarios.gestionar'] },
 ]
