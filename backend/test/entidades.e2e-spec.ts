@@ -89,6 +89,16 @@ describe('Entidades base (e2e)', () => {
       expect(resultado.estado).toBe('encontrado');
     });
 
+    it('si el único curso del nivel tiene letra, no acepta otra letra', async () => {
+      await cursos.crear({ anio: ANIO + 1, nivel: '5', letra: 'A' });
+
+      const resolver = (letra?: string) =>
+        cursos.resolverCurso(ANIO + 1, '5', letra);
+      expect((await resolver('B')).estado).toBe('noExiste');
+      expect((await resolver('a')).estado).toBe('encontrado');
+      expect((await resolver()).estado).toBe('encontrado');
+    });
+
     it('con varios cursos en el nivel, exige la letra', async () => {
       await cursos.crear({ anio: ANIO + 1, nivel: '4', letra: 'A' });
       await cursos.crear({ anio: ANIO + 1, nivel: '4', letra: 'B' });
@@ -100,7 +110,7 @@ describe('Entidades base (e2e)', () => {
       expect((await cursos.resolverCurso(ANIO + 1, '4')).estado).toBe(
         'ambiguo',
       );
-      expect((await cursos.resolverCurso(ANIO + 1, '5')).estado).toBe(
+      expect((await cursos.resolverCurso(ANIO + 1, '6')).estado).toBe(
         'noExiste',
       );
     });
