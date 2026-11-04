@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Types } from 'mongoose';
 import { AlumnosService } from '../alumnos/alumnos.service';
 import { AsignaturasService } from '../asignaturas/asignaturas.service';
-import { CATALOGO_ASIGNATURAS } from '../asignaturas/catalogo';
 import { CursosService } from '../cursos/cursos.service';
 import { NIVELES } from '../cursos/niveles';
 import { generarAlumnosFicticios } from './datos-ficticios';
@@ -35,16 +33,12 @@ export class SemillaService {
       alumnosCreados: 0,
     };
 
+    resumen.cursosCreados = await this.cursosService.prepararAnio(anio);
+
     for (const [indice, nivel] of NIVELES.entries()) {
-      let curso = await this.buscarCurso(anio, nivel);
-      if (!curso) {
-        curso = await this.cursosService.crear({
-          anio,
-          nivel,
-          asignaturaIds: await this.asignaturasDelNivel(nivel),
-        });
-        resumen.cursosCreados++;
-      }
+      const resultado = await this.cursosService.resolverCurso(anio, nivel);
+      if (resultado.estado !== 'encontrado') continue;
+      const curso = resultado.curso;
 
       for (const alumno of generarAlumnosFicticios(indice, ALUMNOS_POR_CURSO)) {
         const existente = alumno.rut
@@ -67,22 +61,5 @@ export class SemillaService {
     }
 
     return resumen;
-  }
-
-  private async buscarCurso(anio: number, nivel: (typeof NIVELES)[number]) {
-    const resultado = await this.cursosService.resolverCurso(anio, nivel);
-    return resultado.estado === 'encontrado' ? resultado.curso : null;
-  }
-
-  private async asignaturasDelNivel(
-    nivel: (typeof NIVELES)[number],
-  ): Promise<Types.ObjectId[]> {
-    const ids: Types.ObjectId[] = [];
-    for (const { codigo, niveles } of CATALOGO_ASIGNATURAS) {
-      if (!niveles.includes(nivel)) continue;
-      const asignatura = await this.asignaturasService.buscarPorCodigo(codigo);
-      if (asignatura) ids.push(asignatura._id);
-    }
-    return ids;
   }
 }

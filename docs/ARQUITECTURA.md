@@ -212,11 +212,12 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 - Todo lo que depende del curso (`matriculas`, `calificaciones`, `asistencias`, filtros y dashboards) referencia siempre **`cursoId`**, nunca el nivel directamente. Los reportes "por nivel" se obtienen agrupando los cursos de ese nivel.
 - En el frontend, el selector muestra el `nombre` del curso. Mientras no haya letras se ve igual que hoy ("4° Básico").
 - **Resolución del curso al cargar archivos** (por año + nivel + letra):
-  - Si el nivel tiene **un solo curso**, la fila se asigna a ese curso, **traiga o no letra el archivo**. Esto importa porque los instrumentos externos escriben una letra aunque la escuela no la use: Letrapps pone "3° Básico A" y el DIA, "3 A".
+  - Si el nivel tiene **un solo curso sin letra**, la fila se asigna a ese curso, **traiga o no letra el archivo**. Esto importa porque los instrumentos externos escriben una letra aunque la escuela no la use: Letrapps pone "3° Básico A" y el DIA, "3 A".
+  - Si el nivel tiene **un solo curso con letra** (p. ej. solo existe 5° A), la fila se asigna si el archivo trae esa letra o no trae ninguna. Si trae **otra** (5° B), es un curso que no existe y la carga se rechaza ("No existe el curso 5° Básico B").
   - Si el nivel tiene **más de un curso**, la letra del archivo tiene que coincidir con la de un curso. Si el archivo no trae letra o la letra no existe, la fila se marca como **error que hay que resolver**.
   - Cada parser traduce el formato de curso de su fuente ("3° Básico A", "3 A", "3°B") a nivel + letra.
-  - ⏳ **Ajuste pendiente:** si el único curso del nivel **tiene letra** (p. ej. solo existe 5° A) y el archivo trae otra (5° B), la fila no debe asignarse: es un curso que no existe. Hoy se asigna igual. Ver "Pendientes acordados" en `CLAUDE.md`.
-- ⏳ **Creación de cursos:** hoy solo los crea la semilla de datos ficticios. Falta que la Directora defina los cursos que se imparten cada año (ver "Pendientes acordados" en `CLAUDE.md`).
+- **Creación de cursos:** la Directora define los cursos que se imparten cada año (endpoints abajo, con el permiso `cursos.gestionar`). Las cargas y la asignación de cursos a docentes rechazan cursos que no existen, así que los cursos creados son el límite de lo que se puede cargar. Cada curso nuevo recibe las asignaturas del catálogo para su nivel.
+  - En un mismo nivel y año **no se mezclan** cursos sin letra y con letra (p. ej. "3° Básico" y "3° Básico A"): la resolución de arriba no sabría a cuál va una fila. Hay un solo curso sin letra o todos con letra.
 - **Cuando la escuela empiece a usar letras:** se crean los cursos del año nuevo con su letra (p. ej. 3° A y 3° B). Los cursos de años anteriores, con `letra: null`, no cambian, así que el historial se mantiene.
 - **Implementación (PGT-56/57):** dos endpoints de lectura, ambos con `@RequierePermisos('alumnos.ver')` y el alcance por curso de la [sección 7.4](#74-alcance-por-curso):
 
@@ -227,6 +228,13 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 
   - El listado de alumnos **nunca** incluye `pie`, `nombreNormalizado` ni `matriculas` (minimización, sección 8.4).
   - Sin sesión responden 401, como todas las rutas protegidas (sección 7.3).
+
+**Creación de cursos**, ambos con `@RequierePermisos('cursos.gestionar')` (hoy, solo la Directora):
+
+| Endpoint | Recibe | Responde | Errores |
+|----------|--------|----------|---------|
+| `POST /api/cursos` | `{ anio, nivel, letra? }`; `nivel` es `"PK"`, `"K"` o `"1"` a `"8"`, y `letra` es una sola letra (se guarda en mayúscula) | 201 con `{ id, anio, nivel, letra, nombre }` | 400 si los datos no son válidos; 409 si el curso ya existe o mezclaría cursos con y sin letra en el nivel |
+| `POST /api/cursos/preparar-anio` | `{ anio }` | 201 con `{ creados, cursos: [{ id, anio, nivel, letra, nombre }] }`: crea, sin letra, el curso de cada nivel (PK a 8°) que no tenga ninguno ese año, y lista todos los cursos del año. Se puede repetir sin duplicar | 400 si `anio` no es válido |
 
 ### 3.3 `asignaturas`
 
@@ -242,7 +250,7 @@ Los identificadores entre colecciones (`alumnoId`, `cursoId`, etc.) son `ObjectI
 
 - El campo **`area`** permite que las alertas "solo Lenguaje" o "solo Matemática" funcionen aunque cada curso o archivo nombre la asignatura de otra forma.
 - Los **`aliases`** permiten reconocer la asignatura al cargar archivos con nombres distintos.
-- **Implementación (PGT-43):** el campo calculado `nombresNormalizados` (nombre y aliases sin tildes y en mayúsculas) permite buscar por cualquiera de ellos. Un alias puede repetirse entre niveles ("Lenguaje" en PK/K y en básica), así que al cargar se busca **dentro de las asignaturas del curso** (`curso.asignaturaIds`). El catálogo inicial está en `backend/src/asignaturas/catalogo.ts` (⏳ confirmar con la malla de la escuela y los nombres de Mi Aula, sobre todo PK y K).
+- **Implementación (PGT-43):** el campo calculado `nombresNormalizados` (nombre y aliases sin tildes y en mayúsculas) permite buscar por cualquiera de ellos. Un alias puede repetirse entre niveles ("Lenguaje" en PK/K y en básica), así que al cargar se busca **dentro de las asignaturas del curso** (`curso.asignaturaIds`). El catálogo inicial está en `backend/src/asignaturas/catalogo.ts` y la API crea las asignaturas que falten al iniciar, sin modificar las existentes (⏳ confirmar con la malla de la escuela y los nombres de Mi Aula, sobre todo PK y K).
 
 ### 3.4 `calificaciones`
 
@@ -819,6 +827,7 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 | `simce.ver` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | —² |
 | `reportes.exportar` | ✅ | — | ✅ | — | ✅ | — | — | — | — |
 | `reglasAlerta.gestionar` | ✅ | — | ✅ | — | — | — | — | — | — |
+| `cursos.gestionar` (cursos que se imparten cada año) | ✅ | — | — | — | — | — | — | — | — |
 | `usuarios.gestionar` | ✅ | — | — | — | — | — | — | — | — |
 | `auditoria.ver` | ✅ | — | — | — | — | — | — | — | — |
 

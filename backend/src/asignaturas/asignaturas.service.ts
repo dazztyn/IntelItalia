@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { normalizarTexto } from '../comun/texto';
@@ -6,11 +6,16 @@ import { Area, Asignatura, AsignaturaDocument } from './asignatura.schema';
 import { CATALOGO_ASIGNATURAS } from './catalogo';
 
 @Injectable()
-export class AsignaturasService {
+export class AsignaturasService implements OnModuleInit {
   constructor(
     @InjectModel(Asignatura.name)
     private readonly asignaturaModel: Model<Asignatura>,
   ) {}
+
+  // También en producción, donde no corre la semilla: los cursos nuevos las necesitan.
+  async onModuleInit(): Promise<void> {
+    await this.asegurarCatalogo();
+  }
 
   listar(): Promise<AsignaturaDocument[]> {
     return this.asignaturaModel.find().sort({ codigo: 1 }).exec();

@@ -71,7 +71,7 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 
 **Implementación (backend):**
 
-- El catálogo de permisos y los roles iniciales están en `backend/src/usuarios/permisos.ts`. Hoy existen `directora` (siempre con todos los permisos: los recupera al iniciar la API) y `docente`; faltan los otros 7 roles.
+- El catálogo de permisos y los roles iniciales están en `backend/src/usuarios/permisos.ts` (la lista `PERMISOS` se repite en `frontend/src/api/types.ts`: mantenerlas iguales). Hoy existen `directora` (siempre con todos los permisos: los recupera al iniciar la API) y `docente`; faltan los otros 7 roles.
 - Decoradores y tipos en `backend/src/comun/autorizacion.ts`: `@RequierePermisos(...)`, `@Publica()`, `@SoloAutenticado()`, `@UsuarioActual()`, `UsuarioAutorizado` y `SolicitudAutorizada`. No crear copias en otros módulos.
 - El guard global (`usuarios/guards/permisos.guard.ts`) **deniega por defecto**: una ruta sin `@RequierePermisos`, `@Publica` ni `@SoloAutenticado` responde 403. Sin sesión, o con un usuario inactivo, responde 401.
 - Filtro por curso en los servicios con `cursosPermitidos(usuario)` y `tieneAccesoACurso(usuario, cursoId)` (`usuarios/alcance.ts`).
@@ -110,7 +110,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 
 | Área | Implementado en `master` | Pendiente |
 |------|--------------------------|-----------|
-| Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43) | — |
+| Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43); creación de cursos por año (`POST /api/cursos` y `/api/cursos/preparar-anio`) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
 | Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
@@ -121,24 +121,12 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 
 Ajustes ya conversados con el equipo que todavía no están en el código. Al implementar uno, borrarlo de esta lista y actualizar `docs/ARQUITECTURA.md`.
 
-1. **Curso con letra al cargar archivos** (`CursosService.resolverCurso`). Hoy, si el nivel tiene un solo curso, la fila se asigna a ese curso **traiga la letra que traiga** el archivo. Eso sirve mientras la escuela no use letras (`letra: null`), pero si solo existe **5°A** y el archivo dice **5°B**, los datos se cargan en 5°A sin aviso. Regla correcta:
-   - el único curso del nivel tiene `letra: null` → se acepta cualquier letra (como hoy);
-   - el único curso tiene letra y el archivo trae **otra** → `noExiste` ("No existe el curso 5° Básico B");
-   - el archivo no trae letra y hay un solo curso → se asigna.
-
-   Agregar un test por caso y corregir la regla en la sección 3.2. Afecta a todas las cargas (DIA y Mi Aula).
-2. **Cursos (niveles) que se imparten cada año.** Hoy los cursos **solo los crea `npm run semilla`**, que no se corre en producción: con el sistema instalado, `cursos` estaría vacía y ninguna carga funcionaría. Hace falta:
-   - `POST /api/cursos` para que la Directora cree un curso del año (`{ anio, nivel, letra? }`), con las asignaturas del catálogo según el nivel, como hace la semilla (`CursosService.crear` ya existe);
-   - opcionalmente, `POST /api/cursos/preparar-anio` para crear de una vez los cursos estándar (PK a 8°) de un año;
-   - las cargas y la asignación de cursos a docentes ya rechazan cursos que no existen, así que la lista de cursos creados funciona como el límite de lo que se puede cargar. Opcional: exigir que el curso tenga alumnos matriculados (la nómina cargada) antes de aceptar notas o asistencia.
-
-   Si más adelante se crea la entidad de **año académico** (año vigente, semestres, cierre), los cursos a impartir pasan a ser parte de "preparar el año".
-3. **Resultados de evaluaciones por curso:** `GET /api/cursos/:id/evaluaciones?anio=` (con `alumnos.ver` y alcance), para la tabla del curso con los % del DIA de cada alumno. Hoy solo están en la ficha, alumno por alumno, y pedir 20 fichas dejaría 20 registros `ficha.ver` en la auditoría.
-4. **Búsqueda de alumnos por RUT, IPE o nombre:** `POST /api/alumnos/busqueda` con `{ texto }`. Es `POST` para que el RUT no quede en la URL ni en los logs del proxy. Un docente solo encuentra alumnos de sus cursos, y una búsqueda fuera de su alcance devuelve una lista vacía (no un 403). `AlumnosService.buscarPorRut` y `buscarPorIpe` ya existen.
-5. **Documentación de la API:** la sección 7.1 de `ARQUITECTURA.md` todavía exige el claim `hd` (ahora `DOMINIO_GOOGLE_PERMITIDO` es opcional) y no documenta qué devuelve `/perfil`. Los endpoints de `/api/usuarios` no están documentados. Conviene una sección "Referencia de la API" con todos los endpoints.
-6. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
-7. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
-8. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
+1. **Resultados de evaluaciones por curso:** `GET /api/cursos/:id/evaluaciones?anio=` (con `alumnos.ver` y alcance), para la tabla del curso con los % del DIA de cada alumno. Hoy solo están en la ficha, alumno por alumno, y pedir 20 fichas dejaría 20 registros `ficha.ver` en la auditoría.
+2. **Búsqueda de alumnos por RUT, IPE o nombre:** `POST /api/alumnos/busqueda` con `{ texto }`. Es `POST` para que el RUT no quede en la URL ni en los logs del proxy. Un docente solo encuentra alumnos de sus cursos, y una búsqueda fuera de su alcance devuelve una lista vacía (no un 403). `AlumnosService.buscarPorRut` y `buscarPorIpe` ya existen.
+3. **Documentación de la API:** la sección 7.1 de `ARQUITECTURA.md` todavía exige el claim `hd` (ahora `DOMINIO_GOOGLE_PERMITIDO` es opcional) y no documenta qué devuelve `/perfil`. Los endpoints de `/api/usuarios` no están documentados. Conviene una sección "Referencia de la API" con todos los endpoints.
+4. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
+5. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
+6. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
 
 ### Tareas para la presentación (noviembre 2026)
 
@@ -155,11 +143,11 @@ Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA fictici
 | 3 | Vista de curso `/cursos/:id`: `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (sección 3.2) | Frontend | — |
 | 4 | Ficha `/alumnos/:id` (sección 9.1): datos, matrículas, tarjetas del DIA; notas y asistencia como "pendiente de Mi Aula" | Frontend | — |
 | 5 | Pantalla de carga `/cargas` (sección 6.2.1): archivo y momento → vista previa → elegir alumno en las filas dudosas → confirmar → resumen e historial. Subir con `FormData` **sin** el `Content-Type: application/json` que agrega `pedir()` | Frontend | — |
-| 6 | Endpoint de resultados por curso (pendiente 3) para mostrar los % del DIA en la vista de curso | Backend | Opcional para la demo |
-| 7 | Referencia de la API (pendiente 5), para que el frontend tenga un solo lugar donde mirar | Backend | — |
+| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la vista de curso | Backend | Opcional para la demo |
+| 7 | Referencia de la API (pendiente 3), para que el frontend tenga un solo lugar donde mirar | Backend | — |
 | 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | 1 a 5 |
 
-**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 1, 2, 4, 6 y 8.
+**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 2, 4 y 6.
 
 
 ## Comandos
