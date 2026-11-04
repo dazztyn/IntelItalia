@@ -1,9 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { obtenerFicha } from '../api/alumnos'
+import { listarCargas } from '../api/cargas'
 import { listarAlumnosDeCurso, listarCursos } from '../api/cursos'
 
 export function useCursos() {
   return useQuery({ queryKey: ['cursos'], queryFn: () => listarCursos() })
+}
+
+export function useCargas() {
+  return useQuery({ queryKey: ['cargas'], queryFn: listarCargas })
 }
 
 export function useAlumnosDeCurso(cursoId: string | null) {

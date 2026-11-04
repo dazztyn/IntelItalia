@@ -1,7 +1,12 @@
 import { useNavigate, useParams } from 'react-router'
 import { ErrorApi } from '../api/cliente'
+import { MOMENTOS_DIA, NOMBRE_AREA, NOMBRE_EJE } from '../datos/tiposCarga'
 import { useFicha } from '../hooks/consultas'
 import { formatoPorcentaje, formatoRut } from '../utils/format'
+
+const nombreMomento = (momento: string) =>
+  MOMENTOS_DIA.find((opcion) => opcion.valor === momento)?.etiqueta ?? momento
+const nombreArea = (area: string) => NOMBRE_AREA[area as keyof typeof NOMBRE_AREA] ?? area
 
 function mensajeDeError(error: unknown): string {
   if (error instanceof ErrorApi && error.estado === 403) return 'Este alumno no está en tus cursos.'
@@ -59,10 +64,19 @@ export function FichaAlumno() {
         <ul className="mt-2 space-y-1 text-sm">
           {alumno.evaluaciones.map((evaluacion) => {
             const logro = evaluacion.resultados.porcentajeLogro
+            const ejes = evaluacion.resultados.porcentajesPorEje as Record<string, number> | null | undefined
             return (
               <li key={`${evaluacion.tipo}-${evaluacion.anio}-${evaluacion.momento}-${evaluacion.area}`}>
-                {evaluacion.tipo} {evaluacion.anio} · {evaluacion.momento} · {evaluacion.area}:{' '}
+                {evaluacion.tipo} {evaluacion.anio} · {nombreMomento(evaluacion.momento)} ·{' '}
+                {nombreArea(evaluacion.area)}:{' '}
                 <strong>{typeof logro === 'number' ? formatoPorcentaje(logro) : '—'}</strong>
+                {ejes && (
+                  <p className="text-xs text-tinta/60 dark:text-italia-blanco/60">
+                    {Object.entries(ejes)
+                      .map(([eje, valor]) => `${NOMBRE_EJE[eje] ?? eje} ${formatoPorcentaje(valor)}`)
+                      .join(' · ')}
+                  </p>
+                )}
               </li>
             )
           })}
