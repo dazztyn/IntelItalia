@@ -7,7 +7,18 @@ export function useVista() {
   const vista: Vista = parametros.get('vista') === 'dashboard' ? 'dashboard' : 'alumnos'
 
   function cambiarVista(nueva: Vista) {
-    setParametros(nueva === 'alumnos' ? {} : { vista: nueva }, { replace: true })
+    setParametros(
+      (actuales) => {
+        const siguientes = new URLSearchParams(actuales)
+        if (nueva === 'alumnos') {
+          siguientes.delete('vista')
+        } else {
+          siguientes.set('vista', nueva)
+        }
+        return siguientes
+      },
+      { replace: true },
+    )
   }
 
   return { vista, cambiarVista }

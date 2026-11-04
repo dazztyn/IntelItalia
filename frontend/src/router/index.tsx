@@ -3,6 +3,7 @@ import { RutaProtegida } from '../components/RutaProtegida'
 import { LayoutPrincipal } from '../layouts/LayoutPrincipal'
 import { Login } from '../pages/Login'
 import { VistaGeneral } from '../pages/VistaGeneral'
+import { FichaAlumno } from '../pages/FichaAlumno'
 
 export const router = createBrowserRouter([
   { path: '/ingresar', element: <Login /> },
@@ -11,7 +12,9 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <LayoutPrincipal />,
-        children: [{ path: '/', element: <VistaGeneral /> }],
+        children: [{ path: '/', element: <VistaGeneral /> }, { path: '/alumnos/:id', element: <FichaAlumno /> }],
+
+        
       },
     ],
   },
