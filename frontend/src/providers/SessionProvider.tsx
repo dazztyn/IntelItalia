@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as api from '../api/autenticacion'
+import { clienteConsultas } from '../api/consultas'
 import type { Usuario } from '../api/types'
 import { SesionContexto, type ValorSesion } from '../contexts/SessionContext'
 
@@ -30,12 +31,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       usuario,
       cargando,
       iniciarSesion: async (idToken) => {
-        setUsuario(await api.iniciarSesionGoogle(idToken))
+        const perfil = await api.iniciarSesionGoogle(idToken)
+        clienteConsultas.clear()
+        setUsuario(perfil)
       },
       cerrarSesion: async () => {
         try {
           await api.cerrarSesion()
         } finally {
+          clienteConsultas.clear()
           setUsuario(null)
         }
       },
