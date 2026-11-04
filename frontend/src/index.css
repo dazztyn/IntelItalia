@@ -1,7 +1,15 @@
 @import 'tailwindcss';
 
-/* Modo oscuro por clase: el botón de tema agrega o quita `dark` en <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta de la escuela */
+@theme {
+  --color-italia-verde: #008c45;
+  --color-italia-blanco: #f4f5f0;
+  --color-italia-rojo: #cd212a;
+  --color-tinta: #0f2a1d;
+  --color-noche: #0b1310;
+}
 
 @layer base {
   html.dark {
@@ -9,6 +17,6 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-italia-blanco text-tinta dark:bg-noche dark:text-italia-blanco;
   }
 }

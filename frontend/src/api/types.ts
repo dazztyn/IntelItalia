@@ -27,3 +27,4 @@ export interface Usuario {
   permisos: Permiso[]
   cursoIds: string[]
 }
+export type Semaforo = 'verde' | 'amarillo' | 'naranjo' | 'rojo'
