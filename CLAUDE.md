@@ -94,6 +94,13 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 - Se registra emitiendo el evento `auditoria.acceso` con `EventEmitter2`; `AuditoriaListener` lo guarda en `registroAuditoria`. Solo identificadores (`usuarioId`, `alumnoId`, `recursoId`), nunca RUT, nombres ni notas.
 - Hoy se registran el inicio de sesión, el cierre, el acceso denegado al login, cada carga (`carga.crear`), cada ficha vista (`ficha.ver`) y cada ficha fuera del alcance (`accesoDenegado`). ⏳ Faltan las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
 
+### Implementación (frontend)
+
+- **`src/api/`:** una función por endpoint, siempre con `pedir()` (`api/cliente.ts`), que agrega el prefijo `/api`, envía la cookie de sesión y convierte los errores en `ErrorApi` con el mensaje del backend.
+- **`hooks/consultas.ts`:** las lecturas pasan por TanStack Query (`useCursos`, `useAlumnosDeCurso`, `useFicha`, `useCargas`). El cliente está en `api/consultas.ts`. Después de guardar algo, invalidar las consultas afectadas (p. ej. `['alumnos']` y `['cargas']` al confirmar una carga).
+- **Rutas (`router/index.tsx`):** todo lo que no es `/ingresar` va dentro de `RutaProtegida` y de `LayoutPrincipal`. Una ruta que exige un permiso se envuelve en `<RutaProtegida permiso="…" />`, que redirige a `/` si falta. El menú (`Sidebar`) oculta las opciones sin permiso. Igual que en el backend, esto no reemplaza el control de la API.
+- **Subir archivos:** con `FormData` y **sin** `Content-Type: application/json`. `pedir()` lo omite solo cuando el `body` es un `FormData`, para que el navegador ponga el `multipart` con su separador.
+
 ## Stack y estructura
 
 Monorepo sin `package.json` raíz: cada carpeta se instala y ejecuta por separado.
@@ -115,7 +122,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
 | Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
-| Frontend | Login con Google conectado al backend, sesión real, rutas protegidas y página de inicio | Vistas de cursos, ficha y carga del DIA (contratos en las secciones 6.2.1 y 9.1); dashboard y administración |
+| Frontend | Login con Google y sesión real; layout con `Topbar` y `Sidebar` (menú según permisos) y TanStack Query. Rutas: `/` vista general (tabla de alumnos por curso con la API y dashboard con datos de ejemplo de `datos/ejemplo.ts`), `/alumnos/:id` ficha con los resultados del DIA y `/cargas` carga del DIA (permiso `cargas.evaluaciones`) | Dashboard con datos reales, administración y alertas |
 
 ### Pendientes acordados (implementar después)
 
@@ -132,20 +139,24 @@ Ajustes ya conversados con el equipo que todavía no están en el código. Al im
 
 Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA ficticio → resolver las filas dudosas → ver la ficha del alumno con su resultado. Todo con datos ficticios.
 
-**Backend (hecho):** login, cursos, alumnos por curso, carga del DIA y ficha. Probado de punta a punta con un login real desde la consola del navegador.
+**Hecho (PR #20 a #23):** el recorrido completo funciona en el frontend y se probó de punta a punta con el DIA ficticio.
+
+| # | Tarea | Dónde quedó |
+|---|-------|-------------|
+| 1 | Script `npm run dia-ficticio` | PR #20 |
+| 2 | Pantalla principal con datos de la API | PR #22: la tabla de alumnos usa la API; el dashboard sigue con datos de ejemplo (ver pendientes) |
+| 3 | Vista de curso | PR #22: quedó dentro de `/`, con un selector de curso (`?curso=`), no en `/cursos/:id` |
+| 4 | Ficha `/alumnos/:id` | PR #22 y #23: datos, matrícula y resultados del DIA con los % por eje. ⏳ Falta la sección "Notas y asistencia: pendiente de Mi Aula" |
+| 5 | Carga `/cargas` | PR #22 y #23: un archivo por curso, vista previa, resolución de filas dudosas, cargas parciales y tarjetas que muestran lo ya cargado. No hay una lista aparte con el historial |
 
 **Pendiente:**
 
 | # | Tarea | Quién | Depende de |
 |---|-------|-------|------------|
-| 1 | Mergear `dia-ficticio-demo` (script `npm run dia-ficticio` y este CLAUDE.md) | Equipo | — |
-| 2 | Mergear `progreso-front` (esqueleto de la pantalla principal) y reemplazar sus datos de ejemplo (`frontend/src/datos/ejemplo.ts`) por la API | Frontend | — |
-| 3 | Vista de curso `/cursos/:id`: `GET /api/cursos` y `GET /api/cursos/:id/alumnos` (sección 3.2) | Frontend | — |
-| 4 | Ficha `/alumnos/:id` (sección 9.1): datos, matrículas, tarjetas del DIA; notas y asistencia como "pendiente de Mi Aula" | Frontend | — |
-| 5 | Pantalla de carga `/cargas` (sección 6.2.1): archivo y momento → vista previa → elegir alumno en las filas dudosas → confirmar → resumen e historial. Subir con `FormData` **sin** el `Content-Type: application/json` que agrega `pedir()` | Frontend | — |
-| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la vista de curso | Backend | Opcional para la demo |
+| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la tabla de alumnos | Backend | Opcional para la demo |
 | 7 | Referencia de la API (pendiente 3), para que el frontend tenga un solo lugar donde mirar | Backend | — |
-| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | 1 a 5 |
+| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | — |
+| 9 | Dashboard (`/?vista=dashboard`): hoy muestra datos de ejemplo de `frontend/src/datos/ejemplo.ts`, con la etiqueta "Datos de ejemplo". En la demo, presentarlo como diseño, o pasarlo a datos reales cuando existan las alertas | Frontend | Alertas (sección 5) |
 
 **Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 2, 4 y 6.
 
