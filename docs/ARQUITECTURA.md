@@ -970,18 +970,20 @@ Como el hosting todavía no está definido, el cumplimiento se apoya sobre todo 
 
 ## 9. Frontend (vistas)
 
-| Ruta | Vista | Contenido |
-|------|-------|-----------|
-| `/ingresar` | Inicio de sesión | Botón de Google; mensaje claro si el correo no está autorizado |
-| `/` | Dashboard | Resumen de la escuela: alumnos por semáforo, por categoría de asistencia y por área con alertas; filtro por curso |
-| `/cursos/:id` | Vista de curso | Tabla de alumnos con semáforo, % de asistencia, promedios de Lenguaje y Matemática, último nivel en evaluaciones externas; ordenable y filtrable |
-| `/alumnos/:id` | **Ficha del alumno** | Resumen y semáforo; asistencia en el tiempo; notas por asignatura (Lenguaje y Matemática destacadas); línea de tiempo de evaluaciones externas; alertas activas e historial; observaciones (según permisos) |
-| `/cargas` | Cargas | Subir archivo por fuente, vista previa, avance e informe de errores por fila, historial de cargas |
-| `/simce` | SIMCE | ⏳ Placeholder: resultados de la escuela por año, nivel y asignatura |
-| `/admin/usuarios` | Usuarios | Lista blanca: agregar o desactivar correos, asignar roles y, a los docentes, sus cursos |
-| `/admin/roles` | Roles y permisos | Matriz editable (solo Directora) |
-| `/admin/reglas` | Reglas de alerta | Edición de umbrales |
-| `/admin/auditoria` | Auditoría | Consulta del registro de accesos (solo Directora) |
+| Ruta | Vista | Contenido | Estado |
+|------|-------|-----------|--------|
+| `/ingresar` | Inicio de sesión | Botón de Google; mensaje claro si el correo no está autorizado | ✅ |
+| `/` | **Vista general**, con dos pestañas en la barra superior | **Listado de alumnos** (por defecto): selector de curso (`?curso=<id>`) y tabla de alumnos del curso, cada uno con enlace a su ficha. Es la vista de curso: no tiene ruta propia. ⏳ Falta sumar semáforo, % de asistencia, promedios y último resultado externo | ✅ Listado con datos de la API |
+| | | **Dashboard de desempeño** (`?vista=dashboard`): resumen de la escuela (alumnos por semáforo, por categoría de asistencia y por área con alertas) | ⏳ Diseño con datos de ejemplo (`frontend/src/datos/ejemplo.ts`, con la etiqueta "Datos de ejemplo"); necesita el motor de alertas |
+| `/alumnos/:id` | **Ficha del alumno** | Resumen y semáforo; asistencia en el tiempo; notas por asignatura (Lenguaje y Matemática destacadas); línea de tiempo de evaluaciones externas; alertas activas e historial; observaciones (según permisos) | ✅ Datos, matrícula y evaluaciones externas (DIA con % por eje). ⏳ Semáforo, alertas, notas, asistencia y observaciones |
+| `/cargas` | Cargas | Una pestaña por fuente y una tarjeta por curso: subir archivo, vista previa, resolver filas dudosas, guardar e informe de errores por fila. Las tarjetas muestran lo ya cargado (`GET /api/cargas`). Exige `cargas.evaluaciones` | ✅ DIA (Lectura y Matemática). ⏳ Letrapps, SEPA y Mi Aula aparecen como "Pronto" |
+| `/simce` | SIMCE | Resultados de la escuela por año, nivel y asignatura | ⏳ |
+| `/admin/usuarios` | Usuarios | Lista blanca: agregar o desactivar correos, asignar roles y, a los docentes, sus cursos | ⏳ (la API ya existe) |
+| `/admin/roles` | Roles y permisos | Matriz editable (solo Directora) | ⏳ (la API ya existe) |
+| `/admin/reglas` | Reglas de alerta | Edición de umbrales | ⏳ |
+| `/admin/auditoria` | Auditoría | Consulta del registro de accesos (solo Directora) | ⏳ |
+
+- **Estructura:** todas las rutas, salvo `/ingresar`, van dentro de `RutaProtegida` (sesión) y de `LayoutPrincipal` (`Topbar` con el menú `Sidebar`). Las que exigen un permiso se envuelven en `<RutaProtegida permiso="…" />`.
 
 - El menú se arma según los permisos del usuario: lo que no puede usar no aparece.
 - Para un usuario con alcance `cursosAsignados`, el dashboard, los selectores de curso y las búsquedas muestran solo sus cursos.
