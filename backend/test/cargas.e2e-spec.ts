@@ -17,7 +17,7 @@ import { CLIENTE_REDIS_SALUD } from './../src/salud/salud.service';
 import { SemillaModule } from './../src/semilla/semilla.module';
 import { SemillaService } from './../src/semilla/semilla.service';
 import { UsuariosService } from './../src/usuarios/usuarios.service';
-import { crearDiaFicticio } from './utilidades/dia-ficticio';
+import { crearDiaFicticio } from './../src/semilla/dia-ficticio';
 
 interface Fila {
   fila: number;

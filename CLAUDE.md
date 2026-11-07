@@ -71,7 +71,7 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 
 **Implementación (backend):**
 
-- El catálogo de permisos y los roles iniciales están en `backend/src/usuarios/permisos.ts`. Hoy existen `directora` (siempre con todos los permisos: los recupera al iniciar la API) y `docente`; faltan los otros 7 roles.
+- El catálogo de permisos y los roles iniciales están en `backend/src/usuarios/permisos.ts` (la lista `PERMISOS` se repite en `frontend/src/api/types.ts`: mantenerlas iguales). Hoy existen `directora` (siempre con todos los permisos: los recupera al iniciar la API) y `docente`; faltan los otros 7 roles.
 - Decoradores y tipos en `backend/src/comun/autorizacion.ts`: `@RequierePermisos(...)`, `@Publica()`, `@SoloAutenticado()`, `@UsuarioActual()`, `UsuarioAutorizado` y `SolicitudAutorizada`. No crear copias en otros módulos.
 - El guard global (`usuarios/guards/permisos.guard.ts`) **deniega por defecto**: una ruta sin `@RequierePermisos`, `@Publica` ni `@SoloAutenticado` responde 403. Sin sesión, o con un usuario inactivo, responde 401.
 - Filtro por curso en los servicios con `cursosPermitidos(usuario)` y `tieneAccesoACurso(usuario, cursoId)` (`usuarios/alcance.ts`).
@@ -86,12 +86,20 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 
 - `POST /api/autenticacion/google` recibe `{ idToken }` (del botón de Google Identity Services) y deja la sesión en la cookie `intelitalia_sesion`. También existen `GET /api/autenticacion/perfil` y `POST /api/autenticacion/salir`.
 - Variables: `GOOGLE_CLIENT_ID` y `JWT_SECRETO` (obligatorias), `DOMINIO_GOOGLE_PERMITIDO` (vacío = cualquier cuenta de Google; con dominio = solo ese Google Workspace) y `CORREO_DIRECTORA_INICIAL` (crea el primer usuario). Ver `.env.example`.
-- ⏳ El frontend todavía no está conectado: el botón de login y la sesión del `SessionProvider` son simulados.
+- **Frontend:** el botón de Google (`@react-oauth/google`) envía el `idToken` al backend. `SessionProvider` consulta `/perfil` al abrir la app (un 401 ahí es normal: significa que no hay sesión), y `RutaProtegida` redirige a `/ingresar` sin sesión. Necesita `VITE_GOOGLE_CLIENT_ID` en `frontend/.env` (Vite no lee el `.env` de la raíz), y el Client ID debe tener `http://localhost:5173` en sus orígenes autorizados.
+- ⏳ En Docker, `VITE_GOOGLE_CLIENT_ID` todavía no se le pasa al build del servicio `web`.
 
 ### Auditoría
 
 - Se registra emitiendo el evento `auditoria.acceso` con `EventEmitter2`; `AuditoriaListener` lo guarda en `registroAuditoria`. Solo identificadores (`usuarioId`, `alumnoId`, `recursoId`), nunca RUT, nombres ni notas.
 - Hoy se registran el inicio de sesión, el cierre, el acceso denegado al login, cada carga (`carga.crear`), cada ficha vista (`ficha.ver`) y cada ficha fuera del alcance (`accesoDenegado`). ⏳ Faltan las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
+
+### Implementación (frontend)
+
+- **`src/api/`:** una función por endpoint, siempre con `pedir()` (`api/cliente.ts`), que agrega el prefijo `/api`, envía la cookie de sesión y convierte los errores en `ErrorApi` con el mensaje del backend.
+- **`hooks/consultas.ts`:** las lecturas pasan por TanStack Query (`useCursos`, `useAlumnosDeCurso`, `useFicha`, `useCargas`). El cliente está en `api/consultas.ts`. Después de guardar algo, invalidar las consultas afectadas (p. ej. `['alumnos']` y `['cargas']` al confirmar una carga).
+- **Rutas (`router/index.tsx`):** todo lo que no es `/ingresar` va dentro de `RutaProtegida` y de `LayoutPrincipal`. Una ruta que exige un permiso se envuelve en `<RutaProtegida permiso="…" />`, que redirige a `/` si falta. El menú (`Sidebar`) oculta las opciones sin permiso. Igual que en el backend, esto no reemplaza el control de la API.
+- **Subir archivos:** con `FormData` y **sin** `Content-Type: application/json`. `pedir()` lo omite solo cuando el `body` es un `FormData`, para que el navegador ponga el `multipart` con su separador.
 
 ## Stack y estructura
 
@@ -109,29 +117,49 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 
 | Área | Implementado en `master` | Pendiente |
 |------|--------------------------|-----------|
-| Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43) | — |
+| Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43); creación de cursos por año (`POST /api/cursos` y `/api/cursos/preparar-anio`) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
 | Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
-| Frontend | Página `/login` (solo diseño) | Conectar el login; cursos, ficha, cargas, dashboard y administración |
+| Frontend | Login con Google y sesión real; layout con `Topbar` y `Sidebar` (menú según permisos) y TanStack Query. Rutas: `/` vista general (tabla de alumnos por curso con la API y dashboard con datos de ejemplo de `datos/ejemplo.ts`), `/alumnos/:id` ficha con los resultados del DIA y `/cargas` carga del DIA (permiso `cargas.evaluaciones`) | Dashboard con datos reales, administración y alertas |
 
 ### Pendientes acordados (implementar después)
 
 Ajustes ya conversados con el equipo que todavía no están en el código. Al implementar uno, borrarlo de esta lista y actualizar `docs/ARQUITECTURA.md`.
 
-1. **Curso con letra al cargar archivos** (`CursosService.resolverCurso`). Hoy, si el nivel tiene un solo curso, la fila se asigna a ese curso **traiga la letra que traiga** el archivo. Eso sirve mientras la escuela no use letras (`letra: null`), pero si solo existe **5°A** y el archivo dice **5°B**, los datos se cargan en 5°A sin aviso. Regla correcta:
-   - el único curso del nivel tiene `letra: null` → se acepta cualquier letra (como hoy);
-   - el único curso tiene letra y el archivo trae **otra** → `noExiste` ("No existe el curso 5° Básico B");
-   - el archivo no trae letra y hay un solo curso → se asigna.
+1. **Resultados de evaluaciones por curso:** `GET /api/cursos/:id/evaluaciones?anio=` (con `alumnos.ver` y alcance), para la tabla del curso con los % del DIA de cada alumno. Hoy solo están en la ficha, alumno por alumno, y pedir 20 fichas dejaría 20 registros `ficha.ver` en la auditoría.
+2. **Búsqueda de alumnos por RUT, IPE o nombre:** `POST /api/alumnos/busqueda` con `{ texto }`. Es `POST` para que el RUT no quede en la URL ni en los logs del proxy. Un docente solo encuentra alumnos de sus cursos, y una búsqueda fuera de su alcance devuelve una lista vacía (no un 403). `AlumnosService.buscarPorRut` y `buscarPorIpe` ya existen.
+3. **Documentación de la API:** la sección 7.1 de `ARQUITECTURA.md` todavía exige el claim `hd` (ahora `DOMINIO_GOOGLE_PERMITIDO` es opcional) y no documenta qué devuelve `/perfil`. Los endpoints de `/api/usuarios` no están documentados. Conviene una sección "Referencia de la API" con todos los endpoints.
+4. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
+5. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
+6. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
 
-   Agregar un test por caso y corregir la regla en la sección 3.2. Afecta a todas las cargas (DIA y Mi Aula).
-2. **Cursos (niveles) que se imparten cada año.** Hoy los cursos **solo los crea `npm run semilla`**, que no se corre en producción: con el sistema instalado, `cursos` estaría vacía y ninguna carga funcionaría. Hace falta:
-   - `POST /api/cursos` para que la Directora cree un curso del año (`{ anio, nivel, letra? }`), con las asignaturas del catálogo según el nivel, como hace la semilla (`CursosService.crear` ya existe);
-   - opcionalmente, `POST /api/cursos/preparar-anio` para crear de una vez los cursos estándar (PK a 8°) de un año;
-   - las cargas y la asignación de cursos a docentes ya rechazan cursos que no existen, así que la lista de cursos creados funciona como el límite de lo que se puede cargar. Opcional: exigir que el curso tenga alumnos matriculados (la nómina cargada) antes de aceptar notas o asistencia.
+### Tareas para la presentación (noviembre 2026)
 
-   Si más adelante se crea la entidad de **año académico** (año vigente, semestres, cierre), los cursos a impartir pasan a ser parte de "preparar el año".
+Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA ficticio → resolver las filas dudosas → ver la ficha del alumno con su resultado. Todo con datos ficticios.
+
+**Hecho (PR #20 a #23):** el recorrido completo funciona en el frontend y se probó de punta a punta con el DIA ficticio.
+
+| # | Tarea | Dónde quedó |
+|---|-------|-------------|
+| 1 | Script `npm run dia-ficticio` | PR #20 |
+| 2 | Pantalla principal con datos de la API | PR #22: la tabla de alumnos usa la API; el dashboard sigue con datos de ejemplo (ver pendientes) |
+| 3 | Vista de curso | PR #22: quedó dentro de `/`, con un selector de curso (`?curso=`), no en `/cursos/:id` |
+| 4 | Ficha `/alumnos/:id` | PR #22 y #23: datos, matrícula y resultados del DIA con los % por eje. ⏳ Falta la sección "Notas y asistencia: pendiente de Mi Aula" |
+| 5 | Carga `/cargas` | PR #22 y #23: un archivo por curso, vista previa, resolución de filas dudosas, cargas parciales y tarjetas que muestran lo ya cargado. No hay una lista aparte con el historial |
+
+**Pendiente:**
+
+| # | Tarea | Quién | Depende de |
+|---|-------|-------|------------|
+| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la tabla de alumnos | Backend | Opcional para la demo |
+| 7 | Referencia de la API (pendiente 3), para que el frontend tenga un solo lugar donde mirar | Backend | — |
+| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | — |
+| 9 | Dashboard (`/?vista=dashboard`): hoy muestra datos de ejemplo de `frontend/src/datos/ejemplo.ts`, con la etiqueta "Datos de ejemplo". En la demo, presentarlo como diseño, o pasarlo a datos reales cuando existan las alertas | Frontend | Alertas (sección 5) |
+
+**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 2, 4 y 6.
+
 
 ## Comandos
 
@@ -156,6 +184,7 @@ npm test              # tests unitarios (Jest)
 npm run test:e2e      # tests e2e (MongoDB en memoria; o MONGO_URI_E2E=… para usar uno existente)
 npm run build
 npm run semilla       # carga datos FICTICIOS (asignaturas, cursos PK–8° y alumnos) en el MONGO_URI de .env; nunca en producción
+npm run dia-ficticio -- 3 lenguaje 2026   # genera un DIA FICTICIO (.xlsx) con los alumnos de la semilla en backend/archivos-ficticios/ (no se sube)
 
 # Frontend
 cd frontend
@@ -166,6 +195,16 @@ npm run build         # tsc -b && vite build
 ```
 
 Antes de dar un cambio por terminado, correr `lint`, `build` y los tests de la carpeta modificada. El CI (`.github/workflows/ci.yml`) corre lo mismo en cada pull request.
+
+**Puesta en marcha en un equipo nuevo (desarrollo):**
+
+1. `cp .env.example .env` en la raíz y completar **todas** las secciones. `JWT_SECRETO` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, y `CORREO_DIRECTORA_INICIAL` con el correo de quien va a entrar.
+2. `frontend/.env` con `VITE_GOOGLE_CLIENT_ID=<el mismo Client ID>`. En Google Cloud, el Client ID tiene que tener `http://localhost:5173` en "Orígenes autorizados de JavaScript".
+3. Abrir Docker Desktop y levantar Mongo y Redis (comando de arriba). Si falla con "ports are not available … 27017", hay un **MongoDB instalado en Windows** ocupando el puerto: detenerlo con `Stop-Service MongoDB` (PowerShell como administrador).
+4. `npm ci` en `backend/` y en `frontend/`.
+5. `npm run semilla -- 2026` y después `npm run dia-ficticio -- 3 lenguaje 2026`. **El año tiene que ser el mismo**, porque el DIA trae el año en la fecha de descarga.
+6. `npm run start:dev` (backend) y `npm run dev` (frontend). Entrar a `http://localhost:5173` con el correo de `CORREO_DIRECTORA_INICIAL`.
+7. Si `crear-usuario-app.js` no creó el usuario de Mongo (por ejemplo, porque se cambió `MONGO_CLAVE_APP` después de crear el volumen), recrear el volumen con `docker compose down -v`, lo que borra los datos locales, y volver a correr la semilla.
 
 **Notas para no romper el CI:**
 

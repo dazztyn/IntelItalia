@@ -1,10 +1,12 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
   NotFoundException,
   Param,
   ParseIntPipe,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
@@ -16,7 +18,14 @@ import {
   type UsuarioAutorizado,
 } from '../comun/autorizacion';
 import { cursosPermitidos, tieneAccesoACurso } from '../usuarios/alcance';
+import { CursoDocument } from './curso.schema';
 import { CursosService } from './cursos.service';
+import { CrearCursoDto } from './dto/crear-curso.dto';
+import { PrepararAnioDto } from './dto/preparar-anio.dto';
+
+function resumenCurso({ _id, anio, nivel, letra, nombre }: CursoDocument) {
+  return { id: _id, anio, nivel, letra, nombre };
+}
 
 @Controller('cursos')
 export class CursosController {
@@ -37,13 +46,23 @@ export class CursosController {
       anio ?? new Date().getFullYear(),
       cursosPermitidos(usuario),
     );
-    return cursos.map(({ _id, anio, nivel, letra, nombre }) => ({
-      id: _id,
-      anio,
-      nivel,
-      letra,
-      nombre,
-    }));
+    return cursos.map(resumenCurso);
+  }
+
+  /** La Directora define los cursos que se imparten en el año (sección 3.2). */
+  @Post()
+  @RequierePermisos('cursos.gestionar')
+  async crear(@Body() dto: CrearCursoDto) {
+    return resumenCurso(await this.cursosService.registrar(dto));
+  }
+
+  /** Crea de una vez los cursos estándar (PK a 8°, sin letra) que falten en el año. */
+  @Post('preparar-anio')
+  @RequierePermisos('cursos.gestionar')
+  async prepararAnio(@Body() { anio }: PrepararAnioDto) {
+    const creados = await this.cursosService.prepararAnio(anio);
+    const cursos = await this.cursosService.listarPorAnio(anio);
+    return { creados, cursos: cursos.map(resumenCurso) };
   }
 
   /** Alumnos con matrícula activa en el curso, solo con los campos del listado. */

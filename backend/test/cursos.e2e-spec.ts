@@ -165,4 +165,92 @@ describe('Cursos y alumnos por curso (e2e)', () => {
       await get(`/api/cursos/${tercero}/alumnos`).expect(401);
     });
   });
+
+  const post = (ruta: string, cuerpo: object, usuarioId: string) =>
+    request(app.getHttpServer())
+      .post(ruta)
+      .set('x-usuario-prueba', usuarioId)
+      .send(cuerpo);
+
+  describe('POST /api/cursos', () => {
+    it('la directora crea un curso con letra y las asignaturas de su nivel', async () => {
+      const respuesta = await post(
+        '/api/cursos',
+        { anio: ANIO + 1, nivel: '3', letra: 'a' },
+        directoraId,
+      ).expect(201);
+      const body = respuesta.body as { id: string };
+
+      expect(body).toEqual({
+        id: expect.any(String) as unknown,
+        anio: ANIO + 1,
+        nivel: '3',
+        letra: 'A',
+        nombre: '3° Básico A',
+      });
+      const curso = await app.get(CursosService).buscarPorId(body.id);
+      expect(curso?.asignaturaIds.length).toBeGreaterThan(0);
+    });
+
+    it('responde 409 si el curso ya existe o mezcla cursos con y sin letra', async () => {
+      await post(
+        '/api/cursos',
+        { anio: ANIO + 1, nivel: '3', letra: 'A' },
+        directoraId,
+      ).expect(409);
+      await post(
+        '/api/cursos',
+        { anio: ANIO + 1, nivel: '3' },
+        directoraId,
+      ).expect(409);
+    });
+
+    it('responde 400 con datos inválidos', async () => {
+      await post('/api/cursos', { anio: ANIO, nivel: 'X' }, directoraId).expect(
+        400,
+      );
+      await post(
+        '/api/cursos',
+        { anio: ANIO, nivel: '3', letra: 'AB' },
+        directoraId,
+      ).expect(400);
+    });
+
+    it('un docente no puede crear cursos', async () => {
+      await post(
+        '/api/cursos',
+        { anio: ANIO + 1, nivel: '4' },
+        docenteId,
+      ).expect(403);
+    });
+  });
+
+  describe('POST /api/cursos/preparar-anio', () => {
+    it('crea los cursos que faltan del año, sin duplicar', async () => {
+      const primera = await post(
+        '/api/cursos/preparar-anio',
+        { anio: ANIO + 2 },
+        directoraId,
+      ).expect(201);
+      expect((primera.body as { creados: number }).creados).toBe(10);
+
+      const segunda = await post(
+        '/api/cursos/preparar-anio',
+        { anio: ANIO + 2 },
+        directoraId,
+      ).expect(201);
+      expect((segunda.body as { creados: number }).creados).toBe(0);
+      expect(
+        await lista(`/api/cursos?anio=${ANIO + 2}`, directoraId),
+      ).toHaveLength(10);
+    });
+
+    it('un docente no puede preparar el año', async () => {
+      await post(
+        '/api/cursos/preparar-anio',
+        { anio: ANIO + 2 },
+        docenteId,
+      ).expect(403);
+    });
+  });
 });

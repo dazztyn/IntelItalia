@@ -11,6 +11,7 @@ export const PERMISOS = [
   'simce.ver',
   'reportes.exportar',
   'reglasAlerta.gestionar',
+  'cursos.gestionar',
   'usuarios.gestionar',
   'auditoria.ver',
 ] as const;
