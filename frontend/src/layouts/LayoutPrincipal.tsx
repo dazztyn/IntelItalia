@@ -1,8 +1,11 @@
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
+import { ControlLectura } from '../components/ControlLectura'
 import { Footer } from '../components/Footer'
 import { Topbar } from '../components/Topbar'
 
 export function LayoutPrincipal() {
+  const { pathname, search } = useLocation()
+
   return (
     <div className="flex min-h-svh flex-col">
       <Topbar />
@@ -10,6 +13,7 @@ export function LayoutPrincipal() {
         <Outlet />
       </main>
       <Footer />
+      <ControlLectura key={pathname + search} />
     </div>
   )
 }

@@ -19,4 +19,7 @@
   body {
     @apply bg-italia-blanco text-tinta dark:bg-noche dark:text-italia-blanco;
   }
+  [data-leyendo] {
+    @apply rounded-sm bg-yellow-200/70 outline-2 outline-offset-2 outline-italia-verde dark:bg-yellow-400/20;
+  }
 }
