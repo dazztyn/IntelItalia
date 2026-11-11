@@ -10,6 +10,7 @@ import type { Alcance, Permiso } from '../usuarios/permisos';
 export const CLAVE_PERMISOS = 'permisosRequeridos';
 export const CLAVE_PUBLICA = 'rutaPublica';
 export const CLAVE_SOLO_AUTENTICADO = 'rutaSoloAutenticado';
+export const EXTRACTOR_SESION_HTTP = 'EXTRACTOR_SESION_HTTP';
 
 export interface ExtractorSesionHttp {
   extraerUsuarioIdDePeticion(peticion: Request): Promise<string | null>;

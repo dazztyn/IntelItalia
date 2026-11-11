@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { VariablesEntorno } from '../configuracion/validacion';
-import { EXTRACTOR_SESION_HTTP } from '../usuarios/guards/permisos.guard';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AutenticacionController } from './autenticacion.controller';
 import { AutenticacionService } from './servicios/autenticacion.service';
@@ -12,6 +11,7 @@ import {
   CLIENTE_OAUTH_GOOGLE,
   VerificadorGoogleService,
 } from './servicios/verificador-google.service';
+import { EXTRACTOR_SESION_HTTP } from 'src/comun/autorizacion';
 
 @Global()
 @Module({

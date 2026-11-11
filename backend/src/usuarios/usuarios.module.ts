@@ -25,6 +25,6 @@ import { MongooseRolesRepository } from './repositorios/mongoose-roles.repositor
     { provide: RolesRepository, useClass: MongooseRolesRepository },
     { provide: APP_GUARD, useClass: PermisosGuard },
   ],
-  exports: [UsuariosService, UsuariosRepository, RolesRepository],
+  exports: [UsuariosService],
 })
 export class UsuariosModule {}
