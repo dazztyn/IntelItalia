@@ -1,11 +1,20 @@
-import type { Curso } from '../../api/types'
-import type { EstadoArchivo } from './tipos'
+import type { FilaVistaPrevia } from '../../api/cargas'
+import type { AlumnoListado, Curso } from '../../api/types'
+import { useAlumnosDeCurso } from '../../hooks/consultas'
+import { filasPorResolver, type EstadoArchivo } from './tipos'
 
 interface Props {
   curso: Curso
   estado: EstadoArchivo
   deshabilitada: boolean
   alElegirArchivo: (archivo: File) => void
+  alResolver: (fila: number, alumnoId: string | null) => void
+}
+
+const DESCARTAR = 'descartar'
+
+function nombreAlumno({ nombres, apellidoPaterno, apellidoMaterno }: AlumnoListado): string {
+  return [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(' ')
 }
 
 interface Apariencia {
@@ -34,16 +43,31 @@ function apariencia(estado: EstadoArchivo): Apariencia {
         flecha: 'text-slate-400',
         detalle: estado.archivo.name,
       }
-    case 'listo':
-      return {
-        etiqueta: 'Listo',
-        barra: 'border-t-emerald-500',
-        insignia: 'bg-emerald-700 text-white',
-        flecha: 'text-emerald-600',
-        detalle:
-          `${estado.filas} filas` +
-          (estado.porRevisar > 0 ? ` · ${estado.porRevisar} no se podrán guardar` : ''),
-      }
+    case 'listo': {
+      const porResolver = filasPorResolver(estado)
+      const detalle = [
+        `${estado.filas} filas`,
+        porResolver > 0 && `${porResolver} por resolver`,
+        estado.errores > 0 && `${estado.errores} con error (no se guardarán)`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      return porResolver > 0
+        ? {
+            etiqueta: 'Por resolver',
+            barra: 'border-t-amber-400',
+            insignia: 'bg-amber-300 text-amber-950',
+            flecha: 'text-amber-500',
+            detalle,
+          }
+        : {
+            etiqueta: 'Listo',
+            barra: 'border-t-emerald-500',
+            insignia: 'bg-emerald-700 text-white',
+            flecha: 'text-emerald-600',
+            detalle,
+          }
+    }
     case 'invalido':
       return {
         etiqueta: 'Revisar archivo',
@@ -76,7 +100,64 @@ function apariencia(estado: EstadoArchivo): Apariencia {
   }
 }
 
-export function TarjetaCurso({ curso, estado, deshabilitada, alElegirArchivo }: Props) {
+interface PropsFilasDudosas {
+  cursoId: string
+  dudosas: FilaVistaPrevia[]
+  ocupados: string[]
+  resoluciones: Record<string, string | null>
+  deshabilitada: boolean
+  alResolver: Props['alResolver']
+}
+
+function FilasDudosas({ cursoId, dudosas, ocupados, resoluciones, deshabilitada, alResolver }: PropsFilasDudosas) {
+  const hayNoEncontrados = dudosas.some((fila) => fila.estado === 'noEncontrado')
+  const alumnos = useAlumnosDeCurso(hayNoEncontrados ? cursoId : null)
+  const libres = (alumnos.data ?? [])
+    .filter((alumno) => !ocupados.includes(alumno.id))
+    .map((alumno) => ({ id: alumno.id, nombreCompleto: nombreAlumno(alumno) }))
+
+  return (
+    <ul className="space-y-2 rounded-md bg-amber-50 p-3 text-sm dark:bg-amber-400/10">
+      {dudosas.map((fila) => {
+        const clave = String(fila.fila)
+        const valor = !(clave in resoluciones) ? '' : (resoluciones[clave] ?? DESCARTAR)
+        const opciones = fila.estado === 'ambiguo' ? fila.candidatos : libres
+        return (
+          <li key={fila.fila} className="flex flex-col gap-1">
+            <span className="font-medium">
+              {fila.nombre}{' '}
+              <span className="font-normal text-secundario">
+                ({fila.estado === 'ambiguo' ? 'varios coinciden' : 'no está en el curso'})
+              </span>
+            </span>
+            <select
+              value={valor}
+              disabled={deshabilitada}
+              aria-label={`Alumno para la fila ${fila.fila}: ${fila.nombre}`}
+              onChange={(evento) => {
+                const elegido = evento.target.value
+                if (elegido) alResolver(fila.fila, elegido === DESCARTAR ? null : elegido)
+              }}
+              className="rounded-md border border-tinta/20 bg-white px-2 py-1.5 dark:border-white/20 dark:bg-noche"
+            >
+              <option value="" disabled>
+                Elegir alumno…
+              </option>
+              <option value={DESCARTAR}>Descartar esta fila</option>
+              {opciones.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.nombreCompleto}
+                </option>
+              ))}
+            </select>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+export function TarjetaCurso({ curso, estado, deshabilitada, alElegirArchivo, alResolver }: Props) {
   const vista = apariencia(estado)
   const bloqueada = deshabilitada || estado.tipo === 'verificando'
 
@@ -92,6 +173,17 @@ export function TarjetaCurso({ curso, estado, deshabilitada, alElegirArchivo }: 
       </div>
 
       <p className="min-h-10 text-sm text-secundario">{vista.detalle}</p>
+
+      {estado.tipo === 'listo' && estado.dudosas.length > 0 && (
+        <FilasDudosas
+          cursoId={curso.id}
+          dudosas={estado.dudosas}
+          ocupados={estado.ocupados}
+          resoluciones={estado.resoluciones}
+          deshabilitada={deshabilitada}
+          alResolver={alResolver}
+        />
+      )}
 
       <label
         className={`inline-flex items-center justify-center gap-2 self-end rounded-md border border-tinta/10 bg-white px-4 py-2 text-sm font-semibold text-tinta shadow-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-italia-verde dark:bg-noche dark:text-italia-blanco ${

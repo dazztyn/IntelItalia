@@ -13,7 +13,7 @@ export interface TipoCarga {
   momentos?: Array<{ valor: string; etiqueta: string }>
 }
 
-const MOMENTOS_DIA = [
+export const MOMENTOS_DIA = [
   { valor: 'diagnostico', etiqueta: 'Diagnóstico' },
   { valor: 'monitoreo', etiqueta: 'Monitoreo intermedio' },
   { valor: 'cierre', etiqueta: 'Cierre' },
@@ -49,3 +49,10 @@ export const TIPOS_CARGA: TipoCarga[] = [
 ]
 
 export const NOMBRE_AREA = { lenguaje: 'Lectura', matematica: 'Matemática' } as const
+
+/** Ejes de Lectura del DIA, como los guarda el backend (cargas/parsers/dia.parser.ts). Los OA de Matemática se muestran tal cual. */
+export const NOMBRE_EJE: Record<string, string> = {
+  localizar: 'Localizar',
+  interpretarRelacionar: 'Interpretar y relacionar',
+  reflexionar: 'Reflexionar',
+}

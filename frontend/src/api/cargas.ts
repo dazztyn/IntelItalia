@@ -41,6 +41,12 @@ export interface ResultadoCarga {
   errores: Array<{ fila: number; campo: string; mensaje: string }>
 }
 
+export type ResumenCarga = Omit<ResultadoCarga, 'errores'>
+
+export function listarCargas(): Promise<ResumenCarga[]> {
+  return pedir<ResumenCarga[]>('/cargas')
+}
+
 function formulario(archivo: File, fuente: FuenteCarga, momento: string): FormData {
   const datos = new FormData()
   datos.append('archivo', archivo)
@@ -56,14 +62,13 @@ export function previsualizarCarga(archivo: File, fuente: FuenteCarga, momento: 
   })
 }
 
-
-export function confirmarCarga(archivo: File, fuente: FuenteCarga, momento: string) {
-  return pedir<ResultadoCarga>('/cargas', {
-    method: 'POST',
-    body: formulario(archivo, fuente, momento),
-  })
-}
-export type ResumenCarga = Omit<ResultadoCarga, 'errores'>
-export function listarCargas() {
-  return pedir<ResumenCarga[]>('/cargas')
+export function confirmarCarga(
+  archivo: File,
+  fuente: FuenteCarga,
+  momento: string,
+  resoluciones: Record<string, string | null> = {},
+) {
+  const datos = formulario(archivo, fuente, momento)
+  datos.append('resoluciones', JSON.stringify(resoluciones))
+  return pedir<ResultadoCarga>('/cargas', { method: 'POST', body: datos })
 }

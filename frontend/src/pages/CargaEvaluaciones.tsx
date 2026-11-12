@@ -6,17 +6,22 @@ import type { Curso } from '../api/types'
 import { ModalResultadoCarga } from '../components/carga/modalResultadoCarga'
 import { PestanasCarga } from '../components/carga/pestanasCarga'
 import { TarjetaCurso } from '../components/carga/tarjetasCurso'
-import type { EstadoArchivo, EstadoPestana, ResumenCurso } from '../components/carga/tipos'
+import {
+  filasPorResolver,
+  type EstadoArchivo,
+  type EstadoPestana,
+  type ResumenCurso,
+} from '../components/carga/tipos'
 import { NOMBRE_AREA, TIPOS_CARGA, type TipoCarga } from '../datos/tiposCarga'
 import { useCargas, useCursos } from '../hooks/consultas'
 
 const PENDIENTE: EstadoArchivo = { tipo: 'pendiente' }
-const TAMANO_MAXIMO = 5 * 1024 * 1024 // el mismo límite que el backend
-const NECESITAN_REVISION: EstadoFila[] = ['ambiguo', 'noEncontrado', 'error']
-const ANIO_ACTUAL = new Date().getFullYear()
-
+const TAMANO_MAXIMO = 5 * 1024 * 1024 
+const DUDOSAS: EstadoFila[] = ['ambiguo', 'noEncontrado']
 const SUBIDOS: EstadoArchivo['tipo'][] = ['guardado', 'previo']
 const CON_ARCHIVO: EstadoArchivo['tipo'][] = ['listo', 'guardado', 'previo']
+
+const EXIGIR_TODOS_LOS_CURSOS = false
 
 function mensajeDeError(error: unknown, porDefecto: string): string {
   return error instanceof ErrorApi ? error.message : porDefecto
@@ -44,11 +49,10 @@ export function CargaEvaluaciones() {
     if (local) return local
     const previa = cargas.data?.find(
       (carga) =>
+        carga.cursoId === cursoId &&
         carga.fuente === t.fuente &&
         carga.area === t.area &&
         carga.momento === momento &&
-        carga.anio === ANIO_ACTUAL &&
-        carga.cursoId === cursoId &&
         carga.estado !== 'fallida',
     )
     return previa ? { tipo: 'previo', carga: previa } : PENDIENTE
@@ -104,14 +108,18 @@ export function CargaEvaluaciones() {
           tipo: 'listo',
           archivo,
           filas: vista.filas.length,
-          porRevisar: vista.filas.filter((fila) => NECESITAN_REVISION.includes(fila.estado)).length,
+          dudosas: vista.filas.filter((fila) => DUDOSAS.includes(fila.estado)),
+          ocupados: vista.filas.flatMap((fila) =>
+            fila.estado === 'encontrado' && fila.alumnoId ? [fila.alumnoId] : [],
+          ),
+          errores: vista.filas.filter((fila) => fila.estado === 'error').length,
+          resoluciones: {},
         }
       }
     } catch (error) {
       siguiente = { tipo: 'invalido', archivo, mensaje: mensajeDeError(error, 'No pudimos revisar el archivo') }
     }
 
-    // Si mientras tanto se eligió otro archivo para este curso, esta respuesta llegó tarde.
     setArchivos((previos) => {
       const actual = previos[claveTab]?.[curso.id]
       if (!actual || !('archivo' in actual) || actual.archivo !== archivo) return previos
@@ -119,14 +127,24 @@ export function CargaEvaluaciones() {
     })
   }
 
+  function resolver(cursoId: string, fila: number, alumnoId: string | null) {
+    const estado = estadoDe(tipo, cursoId)
+    if (estado.tipo !== 'listo') return
+    fijar(clave, cursoId, {
+      ...estado,
+      resoluciones: { ...estado.resoluciones, [String(fila)]: alumnoId },
+    })
+  }
+
   const listos = cursosDelTipo.filter((curso) => estadoDe(tipo, curso.id).tipo === 'listo')
   const conArchivo = cursosDelTipo.filter((curso) => CON_ARCHIVO.includes(estadoDe(tipo, curso.id).tipo))
+  const todoResuelto = listos.every((curso) => {
+    const estado = estadoDe(tipo, curso.id)
+    return estado.tipo === 'listo' && filasPorResolver(estado) === 0
+  })
+  const cursosCubiertos = !EXIGIR_TODOS_LOS_CURSOS || conArchivo.length === cursosDelTipo.length
   const puedeGuardar =
-    tipo.fuente !== null &&
-    cursosDelTipo.length > 0 &&
-    conArchivo.length === cursosDelTipo.length &&
-    listos.length > 0 &&
-    !guardando
+    tipo.fuente !== null && listos.length > 0 && todoResuelto && cursosCubiertos && !guardando
 
   async function guardar() {
     if (!tipo.fuente) return
@@ -134,12 +152,11 @@ export function CargaEvaluaciones() {
     setGuardando(true)
     const resultados: ResumenCurso[] = []
 
-    // Uno por uno: el informe sale en orden y el servidor no recibe todo de golpe.
     for (const curso of listos) {
       const estado = estadoDe(tipo, curso.id)
       if (estado.tipo !== 'listo') continue
       try {
-        const resultado = await confirmarCarga(estado.archivo, tipo.fuente, momento)
+        const resultado = await confirmarCarga(estado.archivo, tipo.fuente, momento, estado.resoluciones)
         fijar(claveTab, curso.id, { tipo: 'guardado', resultado })
         resultados.push({ curso: curso.nombre, resultado })
       } catch (error) {
@@ -150,7 +167,6 @@ export function CargaEvaluaciones() {
     }
 
     setGuardando(false)
-    // Las fichas no se refrescan solas, y el historial alimenta los indicadores de las pestañas.
     await Promise.all([
       clienteConsultas.invalidateQueries({ queryKey: ['alumnos'] }),
       clienteConsultas.invalidateQueries({ queryKey: ['cargas'] }),
@@ -213,6 +229,7 @@ export function CargaEvaluaciones() {
               estado={estadoDe(tipo, curso.id)}
               deshabilitada={guardando}
               alElegirArchivo={(archivo) => void elegirArchivo(curso, archivo)}
+              alResolver={(fila, alumnoId) => resolver(curso.id, fila, alumnoId)}
             />
           ))}
         </div>

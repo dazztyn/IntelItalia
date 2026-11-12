@@ -1,4 +1,4 @@
-import { crearDiaFicticio } from '../../../test/utilidades/dia-ficticio';
+import { crearDiaFicticio } from '../../semilla/dia-ficticio';
 import { FormatoInvalidoError, parsearDia } from './dia.parser';
 
 describe('parsearDia', () => {
