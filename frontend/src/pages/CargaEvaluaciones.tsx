@@ -6,22 +6,26 @@ import type { Curso } from '../api/types'
 import { ModalResultadoCarga } from '../components/carga/modalResultadoCarga'
 import { PestanasCarga } from '../components/carga/pestanasCarga'
 import { TarjetaCurso } from '../components/carga/tarjetasCurso'
-import type { EstadoArchivo, ResumenCurso } from '../components/carga/tipos'
-import { NOMBRE_AREA, TIPOS_CARGA } from '../datos/tiposCarga'
-import { useCursos } from '../hooks/consultas'
+import type { EstadoArchivo, EstadoPestana, ResumenCurso } from '../components/carga/tipos'
+import { NOMBRE_AREA, TIPOS_CARGA, type TipoCarga } from '../datos/tiposCarga'
+import { useCargas, useCursos } from '../hooks/consultas'
 
 const PENDIENTE: EstadoArchivo = { tipo: 'pendiente' }
 const TAMANO_MAXIMO = 5 * 1024 * 1024 // el mismo límite que el backend
 const NECESITAN_REVISION: EstadoFila[] = ['ambiguo', 'noEncontrado', 'error']
+const ANIO_ACTUAL = new Date().getFullYear()
+
+const SUBIDOS: EstadoArchivo['tipo'][] = ['guardado', 'previo']
+const CON_ARCHIVO: EstadoArchivo['tipo'][] = ['listo', 'guardado', 'previo']
 
 function mensajeDeError(error: unknown, porDefecto: string): string {
-  // El backend responde en español ("No existe el curso…", "Solo se aceptan archivos .xlsx").
   return error instanceof ErrorApi ? error.message : porDefecto
 }
 
 export function CargaEvaluaciones() {
   const clienteConsultas = useQueryClient()
   const cursos = useCursos()
+  const cargas = useCargas()
   const [tipoId, setTipoId] = useState(TIPOS_CARGA[0].id)
   const [momento, setMomento] = useState('diagnostico')
   const [archivos, setArchivos] = useState<Record<string, Record<string, EstadoArchivo>>>({})
@@ -30,8 +34,37 @@ export function CargaEvaluaciones() {
 
   const tipo = TIPOS_CARGA.find((t) => t.id === tipoId) ?? TIPOS_CARGA[0]
   const clave = `${tipo.id}-${momento}`
-  const cursosDelTipo = (cursos.data ?? []).filter((curso) => tipo.niveles.includes(curso.nivel))
-  const estadoDe = (cursoId: string) => archivos[clave]?.[cursoId] ?? PENDIENTE
+
+  function cursosDe(t: TipoCarga): Curso[] {
+    return (cursos.data ?? []).filter((curso) => t.niveles.includes(curso.nivel))
+  }
+
+  function estadoDe(t: TipoCarga, cursoId: string): EstadoArchivo {
+    const local = archivos[`${t.id}-${momento}`]?.[cursoId]
+    if (local) return local
+    const previa = cargas.data?.find(
+      (carga) =>
+        carga.fuente === t.fuente &&
+        carga.area === t.area &&
+        carga.momento === momento &&
+        carga.anio === ANIO_ACTUAL &&
+        carga.cursoId === cursoId &&
+        carga.estado !== 'fallida',
+    )
+    return previa ? { tipo: 'previo', carga: previa } : PENDIENTE
+  }
+
+  const cursosDelTipo = cursosDe(tipo)
+
+  const estadosPestanas: Record<string, EstadoPestana | undefined> = Object.fromEntries(
+    TIPOS_CARGA.map((t) => {
+      if (!t.fuente || cursos.isPending || cargas.isPending) return [t.id, undefined]
+      const lista = cursosDe(t)
+      const completo =
+        lista.length > 0 && lista.every((curso) => SUBIDOS.includes(estadoDe(t, curso.id).tipo))
+      return [t.id, completo ? 'completo' : 'pendiente']
+    }),
+  )
 
   function fijar(claveTab: string, cursoId: string, estado: EstadoArchivo) {
     setArchivos((previos) => ({
@@ -86,12 +119,14 @@ export function CargaEvaluaciones() {
     })
   }
 
-  const listos = cursosDelTipo.filter((curso) => estadoDe(curso.id).tipo === 'listo')
-  const todosConArchivo = cursosDelTipo.every((curso) =>
-    ['listo', 'guardado'].includes(estadoDe(curso.id).tipo),
-  )
+  const listos = cursosDelTipo.filter((curso) => estadoDe(tipo, curso.id).tipo === 'listo')
+  const conArchivo = cursosDelTipo.filter((curso) => CON_ARCHIVO.includes(estadoDe(tipo, curso.id).tipo))
   const puedeGuardar =
-    tipo.fuente !== null && cursosDelTipo.length > 0 && todosConArchivo && listos.length > 0 && !guardando
+    tipo.fuente !== null &&
+    cursosDelTipo.length > 0 &&
+    conArchivo.length === cursosDelTipo.length &&
+    listos.length > 0 &&
+    !guardando
 
   async function guardar() {
     if (!tipo.fuente) return
@@ -101,7 +136,7 @@ export function CargaEvaluaciones() {
 
     // Uno por uno: el informe sale en orden y el servidor no recibe todo de golpe.
     for (const curso of listos) {
-      const estado = estadoDe(curso.id)
+      const estado = estadoDe(tipo, curso.id)
       if (estado.tipo !== 'listo') continue
       try {
         const resultado = await confirmarCarga(estado.archivo, tipo.fuente, momento)
@@ -115,15 +150,18 @@ export function CargaEvaluaciones() {
     }
 
     setGuardando(false)
-    // Las fichas en memoria no se refrescan solas: así muestran los resultados nuevos.
-    await clienteConsultas.invalidateQueries({ queryKey: ['alumnos'] })
+    // Las fichas no se refrescan solas, y el historial alimenta los indicadores de las pestañas.
+    await Promise.all([
+      clienteConsultas.invalidateQueries({ queryKey: ['alumnos'] }),
+      clienteConsultas.invalidateQueries({ queryKey: ['cargas'] }),
+    ])
     setResumen(resultados)
   }
 
   function contenidoPanel() {
     if (!tipo.fuente) {
       return (
-        <div className="flex h-full min-h-72 flex-col items-center justify-center text-center text-tinta/60 dark:text-italia-blanco/60">
+        <div className="flex h-full min-h-72 flex-col items-center justify-center text-center text-secundario">
           <p className="text-lg font-semibold">{tipo.etiqueta}: próximamente</p>
           <p className="mt-1 max-w-sm text-sm">
             Esta carga se habilita cuando el sistema reciba el formato real del archivo.
@@ -131,10 +169,14 @@ export function CargaEvaluaciones() {
         </div>
       )
     }
-    if (cursos.isPending) return <p className="text-sm text-tinta/60">Cargando cursos…</p>
-    if (cursos.isError) return <p className="text-sm text-tinta/60">No pudimos cargar los cursos.</p>
+    if (cursos.isPending) return <p className="text-sm text-secundario">Cargando cursos…</p>
+    if (cursos.isError) return <p className="text-sm text-secundario">No pudimos cargar los cursos.</p>
     if (cursosDelTipo.length === 0) {
-      return <p className="text-sm text-tinta/60">No hay cursos de los niveles en que se aplica esta evaluación.</p>
+      return (
+        <p className="text-sm text-secundario">
+          No hay cursos de los niveles en que se aplica esta evaluación.
+        </p>
+      )
     }
 
     return (
@@ -142,7 +184,7 @@ export function CargaEvaluaciones() {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">{tipo.etiqueta}</h2>
-            <p className="text-sm text-tinta/60 dark:text-italia-blanco/60">{tipo.descripcion}</p>
+            <p className="text-sm text-secundario">{tipo.descripcion}</p>
           </div>
           {tipo.momentos && (
             <label className="flex flex-col gap-1 text-sm font-medium">
@@ -168,7 +210,7 @@ export function CargaEvaluaciones() {
             <TarjetaCurso
               key={curso.id}
               curso={curso}
-              estado={estadoDe(curso.id)}
+              estado={estadoDe(tipo, curso.id)}
               deshabilitada={guardando}
               alElegirArchivo={(archivo) => void elegirArchivo(curso, archivo)}
             />
@@ -178,20 +220,19 @@ export function CargaEvaluaciones() {
     )
   }
 
-  const conArchivo = cursosDelTipo.filter((curso) =>
-    ['listo', 'guardado'].includes(estadoDe(curso.id).tipo),
-  ).length
-
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-semibold">Carga de evaluaciones y asistencia</h1>
-      <p className="text-sm text-tinta/60 dark:text-italia-blanco/60">
-        Elige el tipo de carga y sube un archivo por curso.
-      </p>
+      <p className="text-sm text-secundario">Elige el tipo de carga y sube un archivo por curso.</p>
 
-      <div className="mt-4 rounded-2xl bg-linear-to-br from-italia-verde to-green-900 p-4 shadow-lg md:p-6">
+      <div className="mt-4 rounded-2xl bg-linear-to-br from-verde-fondo to-green-900 p-4 shadow-lg md:p-6">
         <div className="flex flex-col md:flex-row">
-          <PestanasCarga tipos={TIPOS_CARGA} activo={tipo.id} alElegir={setTipoId} />
+          <PestanasCarga
+            tipos={TIPOS_CARGA}
+            activo={tipo.id}
+            estados={estadosPestanas}
+            alElegir={setTipoId}
+          />
 
           <section
             id="panel-carga"
@@ -204,8 +245,8 @@ export function CargaEvaluaciones() {
 
         <div className="mt-4 flex flex-wrap items-center justify-end gap-4">
           {tipo.fuente && cursosDelTipo.length > 0 && (
-            <p className="text-sm text-white/80">
-              {conArchivo} de {cursosDelTipo.length} cursos con archivo
+            <p className="text-sm text-white/90">
+              {conArchivo.length} de {cursosDelTipo.length} cursos con archivo
             </p>
           )}
           <button
@@ -214,7 +255,7 @@ export function CargaEvaluaciones() {
             disabled={!puedeGuardar}
             className={`rounded-md px-6 py-2.5 font-semibold transition-colors ${
               puedeGuardar
-                ? 'bg-white text-italia-verde hover:bg-italia-blanco'
+                ? 'bg-white text-verde-texto hover:bg-italia-blanco'
                 : 'cursor-not-allowed bg-white/25 text-white/60'
             }`}
           >

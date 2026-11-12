@@ -64,7 +64,7 @@ export function Topbar() {
                 aria-pressed={activa}
                 className={`relative whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:rounded after:bg-italia-verde after:transition-transform after:duration-300 ${
                   activa
-                    ? 'text-italia-verde after:scale-x-100 dark:text-emerald-400'
+                    ? 'text-verde-texto after:scale-x-100 dark:text-emerald-400'
                     : 'text-tinta/70 after:scale-x-0 hover:text-tinta dark:text-italia-blanco/70 dark:hover:text-italia-blanco'
                 }`}
               >

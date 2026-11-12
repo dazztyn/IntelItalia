@@ -22,7 +22,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Pendiente',
         barra: 'border-t-amber-400',
-        insignia: 'bg-amber-100 text-amber-800',
+        insignia: 'bg-amber-300 text-amber-950',
         flecha: 'text-amber-500',
         detalle: 'Sin archivo',
       }
@@ -30,7 +30,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Revisando…',
         barra: 'border-t-slate-300',
-        insignia: 'bg-slate-100 text-slate-700',
+        insignia: 'bg-slate-200 text-slate-800',
         flecha: 'text-slate-400',
         detalle: estado.archivo.name,
       }
@@ -38,7 +38,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Listo',
         barra: 'border-t-emerald-500',
-        insignia: 'bg-emerald-100 text-emerald-800',
+        insignia: 'bg-emerald-700 text-white',
         flecha: 'text-emerald-600',
         detalle:
           `${estado.filas} filas` +
@@ -48,7 +48,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Revisar archivo',
         barra: 'border-t-red-500',
-        insignia: 'bg-red-100 text-red-800',
+        insignia: 'bg-red-700 text-white',
         flecha: 'text-red-600',
         detalle: estado.mensaje,
       }
@@ -56,12 +56,22 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       const { estado: resultado, filasOk, filasTotales } = estado.resultado
       const detalle = `${filasOk} de ${filasTotales} filas guardadas`
       if (resultado === 'completada') {
-        return { etiqueta: 'Guardado', barra: 'border-t-emerald-500', insignia: 'bg-emerald-100 text-emerald-800', flecha: 'text-emerald-600', detalle }
+        return { etiqueta: 'Guardado', barra: 'border-t-emerald-500', insignia: 'bg-emerald-700 text-white', flecha: 'text-emerald-600', detalle }
       }
       if (resultado === 'completadaConErrores') {
-        return { etiqueta: 'Guardado con errores', barra: 'border-t-amber-400', insignia: 'bg-amber-100 text-amber-800', flecha: 'text-amber-500', detalle }
+        return { etiqueta: 'Guardado con errores', barra: 'border-t-amber-400', insignia: 'bg-amber-300 text-amber-950', flecha: 'text-amber-500', detalle }
       }
-      return { etiqueta: 'No se guardó', barra: 'border-t-red-500', insignia: 'bg-red-100 text-red-800', flecha: 'text-red-600', detalle }
+      return { etiqueta: 'No se guardó', barra: 'border-t-red-500', insignia: 'bg-red-700 text-white', flecha: 'text-red-600', detalle }
+    }
+        case 'previo': {
+      const fecha = new Date(estado.carga.finalizadaEn).toLocaleDateString('es-CL')
+      return {
+        etiqueta: 'Cargado',
+        barra: 'border-t-emerald-500',
+        insignia: 'bg-emerald-700 text-white',
+        flecha: 'text-emerald-600',
+        detalle: `${estado.carga.filasOk} de ${estado.carga.filasTotales} filas · ${fecha}`,
+      }
     }
   }
 }
@@ -81,7 +91,7 @@ export function TarjetaCurso({ curso, estado, deshabilitada, alElegirArchivo }: 
         </span>
       </div>
 
-      <p className="min-h-10 text-sm text-tinta/60 dark:text-italia-blanco/60">{vista.detalle}</p>
+      <p className="min-h-10 text-sm text-secundario">{vista.detalle}</p>
 
       <label
         className={`inline-flex items-center justify-center gap-2 self-end rounded-md border border-tinta/10 bg-white px-4 py-2 text-sm font-semibold text-tinta shadow-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-italia-verde dark:bg-noche dark:text-italia-blanco ${

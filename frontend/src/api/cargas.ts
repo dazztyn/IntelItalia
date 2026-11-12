@@ -63,3 +63,7 @@ export function confirmarCarga(archivo: File, fuente: FuenteCarga, momento: stri
     body: formulario(archivo, fuente, momento),
   })
 }
+export type ResumenCarga = Omit<ResultadoCarga, 'errores'>
+export function listarCargas() {
+  return pedir<ResumenCarga[]>('/cargas')
+}

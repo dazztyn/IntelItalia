@@ -7,7 +7,7 @@ import { formatoRut } from '../../utils/format'
 
 function Aviso({ children }: { children: ReactNode }) {
   return (
-    <p className="px-4 py-10 text-center text-sm text-tinta/60 dark:text-italia-blanco/60">
+    <p className="px-4 py-10 text-center text-sm text-secundario">
       {children}
     </p>
   )
@@ -60,7 +60,7 @@ export function TablaAlumnos() {
 
     return (
       <table className="w-full text-left text-sm">
-        <thead className="bg-linear-to-br from-italia-verde to-green-900 text-white">
+        <thead className="bg-linear-to-br from-verde-fondo to-green-900 text-white">
           <tr>
             <th scope="col" className="w-14 px-4 py-3 text-right font-semibold">N°</th>
             <th scope="col" className="px-4 py-3 font-semibold">Alumno</th>
@@ -70,18 +70,18 @@ export function TablaAlumnos() {
         <tbody className="divide-y divide-tinta/10 dark:divide-white/10">
           {alumnos.data.map((alumno, indice) => (
             <tr key={alumno.id} className="transition-colors hover:bg-italia-verde/5">
-              <td className="px-4 py-3 text-right tabular-nums text-tinta/60 dark:text-italia-blanco/60">
+              <td className="px-4 py-3 text-right tabular-nums text-secundario">
                 {indice + 1}
               </td>
               <td className="px-4 py-3">
                 <Link
                   to={`/alumnos/${alumno.id}`}
-                  className="font-medium text-italia-verde hover:underline dark:text-emerald-400"
+                  className="font-medium text-verde-texto hover:underline dark:text-emerald-400"
                 >
                   {nombreCompleto(alumno)}
                 </Link>
               </td>
-              <td className="px-4 py-3 tabular-nums text-tinta/70 dark:text-italia-blanco/70">
+              <td className="px-4 py-3 tabular-nums text-secundario">
                 {identificacion(alumno)}
               </td>
             </tr>
@@ -96,7 +96,7 @@ export function TablaAlumnos() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Listado de alumnos</h1>
-          <p className="text-sm text-tinta/60 dark:text-italia-blanco/60">
+          <p className="text-sm text-secundario">
             Alumnos con matrícula activa en el curso
           </p>
         </div>

@@ -12,7 +12,7 @@ export function RutaProtegida({ permiso }: Props) {
 
   if (cargando) {
     return (
-      <div className="flex min-h-svh items-center justify-center text-slate-500">
+      <div className="flex min-h-svh items-center justify-center text-secundario">
         Cargando…
       </div>
     )

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Segmento } from '../utils/textoLegible'
+import { paraVoz } from '../utils/pronunciacion'
 
 const SOPORTADO = typeof window !== 'undefined' && 'speechSynthesis' in window
-const VELOCIDADES = [1, 1.25, 1.5, 0.75]
+export const VELOCIDAD_MINIMA = 0.5
+export const VELOCIDAD_MAXIMA = 2
 const CLAVE_VELOCIDAD = 'velocidadLectura'
 const LARGO_MAXIMO = 180
 
@@ -24,7 +26,7 @@ function elegirVoz(): SpeechSynthesisVoice | null {
 function leerVelocidadGuardada(): number {
   try {
     const guardada = Number(localStorage.getItem(CLAVE_VELOCIDAD))
-    return VELOCIDADES.includes(guardada) ? guardada : 1
+        return guardada >= VELOCIDAD_MINIMA && guardada <= VELOCIDAD_MAXIMA ? guardada : 1
   } catch {
     return 1
   }
@@ -112,9 +114,8 @@ export function useLectorVoz() {
       const id = ++lectura.current
       const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const frases = segmentos.flatMap((segmento) =>
-        partir(segmento.texto).map((texto) => ({ texto, elemento: segmento.elemento })),
-      )
-
+          partir(paraVoz(segmento.texto)).map((texto) => ({ texto, elemento: segmento.elemento })),
+    )
       frases.forEach(({ texto, elemento }, indice) => {
         const frase = new SpeechSynthesisUtterance(texto)
         frase.voice = voz
@@ -153,10 +154,10 @@ export function useLectorVoz() {
     [voz, velocidad, quitarMarca],
   )
 
-  function cambiarVelocidad() {
-    const siguiente = VELOCIDADES[(VELOCIDADES.indexOf(velocidad) + 1) % VELOCIDADES.length]
-    setVelocidad(siguiente)
-    guardarVelocidad(siguiente)
+    function fijarVelocidad(nueva: number) {
+    const valor = Math.min(VELOCIDAD_MAXIMA, Math.max(VELOCIDAD_MINIMA, nueva))
+    setVelocidad(valor)
+    guardarVelocidad(valor)
   }
 
   return {
@@ -165,7 +166,7 @@ export function useLectorVoz() {
     buscandoVoz,
     hablando,
     velocidad,
-    cambiarVelocidad,
+    fijarVelocidad,
     leer,
     detener,
   }
