@@ -6,6 +6,8 @@ import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
 import { CargasController } from './cargas.controller';
 import { CargasService } from './cargas.service';
 import { Carga, CargaSchema } from './schemas/carga.schema';
+import { CargasRepository } from './repositorios/cargas.repository';
+import { MongooseCargasRepository } from './repositorios/mongoose-cargas.repository';
 
 @Module({
   imports: [
@@ -15,6 +17,10 @@ import { Carga, CargaSchema } from './schemas/carga.schema';
     EvaluacionesModule,
   ],
   controllers: [CargasController],
-  providers: [CargasService],
+  providers: [
+    CargasService,
+    { provide: CargasRepository, useClass: MongooseCargasRepository },
+  ],
+  exports: [CargasService],
 })
 export class CargasModule {}

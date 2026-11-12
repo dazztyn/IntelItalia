@@ -2,18 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import type Redis from 'ioredis';
 import { Connection, ConnectionStates } from 'mongoose';
+import { EstadoSalud } from './interfaces/estado-salud.interface';
 
 export const CLIENTE_REDIS_SALUD = 'CLIENTE_REDIS_SALUD';
 
 const TIEMPO_MAXIMO_PING_MS = 1000;
 
 export type EstadoServicio = 'arriba' | 'abajo';
-
-export interface EstadoSalud {
-  estado: 'ok' | 'degradado';
-  mongo: EstadoServicio;
-  redis: EstadoServicio;
-}
 
 @Injectable()
 export class SaludService {

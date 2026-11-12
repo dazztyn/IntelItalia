@@ -1,8 +1,8 @@
 // Generador de alumnos FICTICIOS para desarrollo y pruebas. Nunca se usan datos reales
 // (CLAUDE.md, Ley 21.719). Es determinista: la misma semilla da los mismos alumnos,
 // así que correr la carga dos veces no duplica nada.
-import { DatosPie } from '../alumnos/alumno.schema';
 import { calcularDigitoVerificador } from '../comun/rut';
+import { AlumnoFicticio } from './interfaces/alumno-ficticio.interface';
 
 const NOMBRES = [
   'Sofía',
@@ -90,16 +90,6 @@ function elegir<T>(lista: readonly T[], aleatorio: () => number): T {
 
 function conDigito(cuerpo: number): string {
   return `${cuerpo}-${calcularDigitoVerificador(String(cuerpo))}`;
-}
-
-export interface AlumnoFicticio {
-  rut: string | null;
-  ipe: string | null;
-  nombres: string;
-  apellidoPaterno: string;
-  apellidoMaterno: string | null;
-  retirado: boolean;
-  pie?: DatosPie;
 }
 
 /**

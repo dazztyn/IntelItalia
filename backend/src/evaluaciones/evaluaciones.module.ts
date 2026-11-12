@@ -9,6 +9,8 @@ import {
   TipoEvaluacion,
   TipoEvaluacionSchema,
 } from './schemas/tipo-evaluacion.schema';
+import { EvaluacionesRepository } from './repositorios/evaluaciones.repository';
+import { MongooseEvaluacionesRepository } from './repositorios/mongoose-evaluaciones.repository';
 
 // Sin controlador: los resultados se ven en la ficha del alumno y se cargan en `cargas`.
 @Module({
@@ -18,7 +20,13 @@ import {
       { name: ResultadoEvaluacion.name, schema: ResultadoEvaluacionSchema },
     ]),
   ],
-  providers: [EvaluacionesService],
+  providers: [
+    EvaluacionesService,
+    {
+      provide: EvaluacionesRepository,
+      useClass: MongooseEvaluacionesRepository,
+    },
+  ],
   exports: [EvaluacionesService],
 })
 export class EvaluacionesModule {}

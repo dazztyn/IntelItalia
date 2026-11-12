@@ -5,6 +5,8 @@ import { AsignaturasModule } from '../asignaturas/asignaturas.module';
 import { Curso, CursoSchema } from './curso.schema';
 import { CursosController } from './cursos.controller';
 import { CursosService } from './cursos.service';
+import { CursosRepository } from './repositorios/cursos.repository';
+import { MongooseCursosRepository } from './repositorios/mongoose-cursos.repository';
 
 @Module({
   imports: [
@@ -13,7 +15,10 @@ import { CursosService } from './cursos.service';
     AsignaturasModule,
   ],
   controllers: [CursosController],
-  providers: [CursosService],
+  providers: [
+    CursosService,
+    { provide: CursosRepository, useClass: MongooseCursosRepository },
+  ],
   exports: [CursosService],
 })
 export class CursosModule {}

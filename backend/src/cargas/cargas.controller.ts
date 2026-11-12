@@ -20,8 +20,9 @@ import {
   UsuarioActual,
   type UsuarioAutorizado,
 } from '../comun/autorizacion';
-import { ArchivoSubido, CargasService } from './cargas.service';
+import { CargasService } from './cargas.service';
 import { CargaDto, ConfirmarCargaDto } from './dto/carga.dto';
+import { ArchivoSubido } from './interfaces/archivo-subido.interface';
 
 // Sin `dest`, multer deja el archivo en memoria: nunca se escribe en disco y se
 // descarta al terminar la petición (minimización, sección 8.4).

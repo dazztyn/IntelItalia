@@ -1,18 +1,9 @@
 import { Workbook } from 'exceljs';
+import { OpcionesDiaFicticio } from './interfaces/opciones-dia-ficticio.interface';
 
 // Arma en memoria un reporte del DIA con el mismo formato que el real
 // (docs/ARQUITECTURA.md, sección 4.4), pero con datos FICTICIOS.
 // Nunca usar un archivo real de la escuela en los tests.
-
-export interface OpcionesDiaFicticio {
-  curso?: string;
-  fechaDescarga?: string;
-  area?: 'lenguaje' | 'matematica';
-  /** Una fila por alumno: n° de lista, nombre como lo escribe el DIA y porcentajes. */
-  filas: Array<[number | null, string, ...(string | number | null)[]]>;
-  /** Encabezados de resultados; por defecto, los ejes de Lectura o 3 OA. */
-  ejes?: string[];
-}
 
 export async function crearDiaFicticio(
   opciones: OpcionesDiaFicticio,

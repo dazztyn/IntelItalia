@@ -5,8 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectModel } from '@nestjs/mongoose';
-import { isObjectIdOrHexString, Model, Types } from 'mongoose';
+import { isObjectIdOrHexString, Types } from 'mongoose';
 import { AlumnosService } from '../alumnos/alumnos.service';
 import type { UsuarioAutorizado } from '../comun/autorizacion';
 import { CursoDocument } from '../cursos/curso.schema';
@@ -15,44 +14,15 @@ import { nombreCurso } from '../cursos/niveles';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
 import { tieneAccesoACurso } from '../usuarios/alcance';
 import { CargaDto, ConfirmarCargaDto } from './dto/carga.dto';
+import { FormatoInvalidoError, parsearDia } from './parsers/dia.parser';
+import { CargaDocument, ErrorFila } from './schemas/carga.schema';
+import { CargasRepository } from './repositorios/cargas.repository';
+import { ArchivoSubido } from './interfaces/archivo-subido.interface';
 import {
-  FilaDia,
-  FormatoInvalidoError,
-  parsearDia,
-} from './parsers/dia.parser';
-import { Carga, CargaDocument, ErrorFila } from './schemas/carga.schema';
-
-/** Lo que se necesita del archivo subido (multer lo deja en memoria). */
-export interface ArchivoSubido {
-  originalname: string;
-  buffer: Buffer;
-}
-
-export type EstadoFila =
-  'encontrado' | 'ambiguo' | 'noEncontrado' | 'sinResultado' | 'error';
-
-export interface FilaVistaPrevia {
-  fila: number;
-  numeroLista: number | null;
-  /** Nombre como viene en el archivo, para que el usuario resuelva; no se guarda. */
-  nombre: string;
-  estado: EstadoFila;
-  /** Alumno identificado (solo con estado `encontrado`). */
-  alumnoId: string | null;
-  candidatos: Array<{ id: string; nombreCompleto: string }>;
-  porcentajesPorEje: Record<string, number> | null;
-  porcentajeLogro: number | null;
-  mensaje?: string;
-}
-
-export interface VistaPrevia {
-  curso: { id: string; nombre: string };
-  anio: number;
-  area: 'lenguaje' | 'matematica';
-  momento: string;
-  ejes: string[];
-  filas: FilaVistaPrevia[];
-}
+  FilaVistaPrevia,
+  VistaPrevia,
+} from './interfaces/vista-previa.interface';
+import { FilaDia } from './interfaces/archivo-dia.interface';
 
 // Carga del DIA (docs/ARQUITECTURA.md, sección 6). Se procesa dentro de la petición:
 // un archivo trae ~25 filas. shortcut: sin BullMQ ni avance por partes; pasar a la
@@ -60,7 +30,7 @@ export interface VistaPrevia {
 @Injectable()
 export class CargasService {
   constructor(
-    @InjectModel(Carga.name) private readonly cargaModel: Model<Carga>,
+    private readonly cargasRepo: CargasRepository,
     private readonly cursosService: CursosService,
     private readonly alumnosService: AlumnosService,
     private readonly evaluacionesService: EvaluacionesService,
@@ -156,7 +126,7 @@ export class CargasService {
       guardados.add(alumnoId);
     }
 
-    const carga = await this.cargaModel.create({
+    const carga = await this.cargasRepo.crear({
       _id: cargaId,
       fuente: dto.fuente,
       nombreArchivo: archivo.originalname.slice(0, 200),
@@ -192,16 +162,12 @@ export class CargasService {
 
   // shortcut: últimas 50 cargas sin paginar ni filtrar; agregar filtros cuando haya muchas.
   async listar() {
-    const cargas = await this.cargaModel
-      .find()
-      .sort({ iniciadaEn: -1 })
-      .limit(50)
-      .exec();
+    const cargas = await this.cargasRepo.listarRecientes(50);
     return cargas.map(resumenCarga);
   }
 
   async obtener(id: Types.ObjectId) {
-    const carga = await this.cargaModel.findById(id).exec();
+    const carga = await this.cargasRepo.buscarPorId(id);
     if (!carga) throw new NotFoundException('La carga no existe');
     return detalleCarga(carga);
   }
