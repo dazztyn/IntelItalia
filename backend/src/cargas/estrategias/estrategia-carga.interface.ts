@@ -1,37 +1,59 @@
 import { Types } from 'mongoose';
-import { CursoDocument } from '../../cursos/curso.schema';
-import { ArchivoSubido } from '../interfaces/archivo-subido.interface';
+import type { UsuarioAutorizado } from '../../comun/autorizacion';
+import { Nivel } from '../../cursos/niveles';
 import { CargaDto } from '../dto/carga.dto';
+import { ErrorFila, FuenteCarga } from '../schemas/carga.schema';
+import { ArchivoSubido } from '../interfaces/archivo-subido.interface';
+import { VistaPrevia } from '../interfaces/vista-previa.interface';
 
-export interface FilaExtraida<T = unknown> {
+export interface FilaExtraida<TDatos = unknown> {
   fila: number;
   numeroLista: number | null;
   nombre: string;
   error?: string;
   sinResultado?: boolean;
-  datos: T;
+  datos: TDatos;
 }
 
-export interface DatosParseados<T = unknown, M = unknown> {
+export interface DatosParseados<TDatos = unknown, TMeta = unknown> {
   anio: number;
-  nivel: string;
+  nivel: Nivel;
   letra: string | null;
-  area: string;
+  area: 'lenguaje' | 'matematica';
   ejes: string[];
-  filas: FilaExtraida<T>[];
-  meta: M;
+  filas: FilaExtraida<TDatos>[];
+  meta: TMeta;
 }
 
-export interface EstrategiaCarga<T = unknown, M = unknown> {
-  readonly fuente: string;
-  
-  parsear(archivo: ArchivoSubido, dto: CargaDto): Promise<DatosParseados<T, M>>;
-  
-  guardar(
-    filasAprobadas: Array<{ filaOriginal: FilaExtraida<T>; alumnoId: string }>,
-    curso: CursoDocument,
-    anio: number,
+export interface FilaAprobada<TDatos = unknown> {
+  filaOriginal: FilaExtraida<TDatos>;
+  alumnoId: string;
+}
+
+export interface ResultadoProcesamientoCarga {
+  cursoId: Types.ObjectId;
+  anio: number;
+  momento: string;
+  area: string;
+  filasTotales: number;
+  filasOk: number;
+  errores: ErrorFila[];
+}
+
+export interface EstrategiaCarga {
+  readonly fuente: FuenteCarga;
+
+  previsualizar(
+    archivo: ArchivoSubido,
+    dto: CargaDto,
+    usuario: UsuarioAutorizado,
+  ): Promise<VistaPrevia>;
+
+  procesarConfirmacion(
+    archivo: ArchivoSubido,
+    dto: CargaDto,
+    resoluciones: Record<string, string | null>,
+    usuario: UsuarioAutorizado,
     cargaId: Types.ObjectId,
-    meta: M,
-  ): Promise<void>;
+  ): Promise<ResultadoProcesamientoCarga>;
 }

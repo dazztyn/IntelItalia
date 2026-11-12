@@ -101,12 +101,11 @@ export class CursosService {
   }
 
   private async asignaturasDelNivel(nivel: Nivel): Promise<Types.ObjectId[]> {
-    const ids: Types.ObjectId[] = [];
-    for (const { codigo, niveles } of CATALOGO_ASIGNATURAS) {
-      if (!niveles.includes(nivel)) continue;
-      const asignatura = await this.asignaturasService.buscarPorCodigo(codigo);
-      if (asignatura) ids.push(asignatura._id);
-    }
-    return ids;
+    const codigos = CATALOGO_ASIGNATURAS.filter(({ niveles }) =>
+      niveles.includes(nivel),
+    ).map(({ codigo }) => codigo);
+
+    const asignaturas = await this.asignaturasService.buscarPorCodigos(codigos);
+    return asignaturas.map((asignatura) => asignatura._id);
   }
 }

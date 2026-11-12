@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { CookieOptions, Request, Response } from 'express';
 import { VariablesEntorno } from '../../configuracion/validacion';
 import { PayloadJwt } from '../interfaces/payload-jwt.interface';
-import { ExtractorSesionHttp } from 'src/comun/autorizacion';
+import { ExtractorSesionHttp } from '../../comun/autorizacion';
 
 export const NOMBRE_COOKIE_SESION = 'intelitalia_sesion';
 

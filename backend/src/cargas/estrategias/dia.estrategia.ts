@@ -1,30 +1,50 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { AlumnosService } from '../../alumnos/alumnos.service';
 import { Area } from '../../asignaturas/asignatura.schema';
 import { CursoDocument } from '../../cursos/curso.schema';
+import { CursosService } from '../../cursos/cursos.service';
 import { EvaluacionesService } from '../../evaluaciones/evaluaciones.service';
 import { CargaDto } from '../dto/carga.dto';
 import { ArchivoSubido } from '../interfaces/archivo-subido.interface';
-import { FormatoInvalidoError, parsearDia } from '../parsers/dia.parser';
-import { DatosParseados, EstrategiaCarga, FilaExtraida } from './estrategia-carga.interface';
+import {
+  DatosParseados,
+  FilaAprobada,
+  FilaExtraida,
+} from './estrategia-carga.interface';
 import { DatosDia, MetaDia } from '../interfaces/estrategia-dia.interface';
-    
+import { FilaVistaPrevia } from '../interfaces/vista-previa.interface';
+import { FormatoInvalidoError, parsearDia } from '../parsers/dia.parser';
+import { FuenteCarga } from '../schemas/carga.schema';
+import { ProcesadorCargaBase } from './procesador-carga.base';
+
 @Injectable()
-export class DiaEstrategia implements EstrategiaCarga<DatosDia, MetaDia> {
-  readonly fuente = 'dia';
+export class DiaEstrategia extends ProcesadorCargaBase<DatosDia, MetaDia> {
+  readonly fuente: FuenteCarga = 'dia';
 
-  constructor(private readonly evaluacionesService: EvaluacionesService) {}
+  constructor(
+    cursosService: CursosService,
+    alumnosService: AlumnosService,
+    private readonly evaluacionesService: EvaluacionesService,
+  ) {
+    super(cursosService, alumnosService);
+  }
 
-  async parsear(archivo: ArchivoSubido, dto: CargaDto): Promise<DatosParseados<DatosDia, MetaDia>> {
+  protected async parsear(
+    archivo: ArchivoSubido,
+    dto: CargaDto,
+  ): Promise<DatosParseados<DatosDia, MetaDia>> {
     const tipo = await this.evaluacionesService.buscarTipoPorCodigo('DIA');
     if (!tipo) throw new Error('Falta el tipo de evaluación DIA');
     if (!tipo.momentos.includes(dto.momento)) {
-      throw new BadRequestException(`momento inválido; usar: ${tipo.momentos.join(', ')}`);
+      throw new BadRequestException(
+        `momento inválido; usar: ${tipo.momentos.join(', ')}`,
+      );
     }
 
     try {
       const dia = await parsearDia(archivo.buffer);
-      
+
       const filas: FilaExtraida<DatosDia>[] = dia.filas.map((f) => ({
         fila: f.fila,
         numeroLista: f.numeroLista,
@@ -44,7 +64,11 @@ export class DiaEstrategia implements EstrategiaCarga<DatosDia, MetaDia> {
         area: dia.area,
         ejes: dia.ejes,
         filas,
-        meta: { tipoId: tipo._id as Types.ObjectId, momento: dto.momento, area: dia.area },
+        meta: {
+          tipoId: tipo._id,
+          momento: dto.momento,
+          area: dia.area,
+        },
       };
     } catch (error) {
       if (error instanceof FormatoInvalidoError) {
@@ -54,20 +78,28 @@ export class DiaEstrategia implements EstrategiaCarga<DatosDia, MetaDia> {
     }
   }
 
-  async guardar(
-    filasAprobadas: Array<{ filaOriginal: FilaExtraida<DatosDia>; alumnoId: string }>,
+  protected armarDatosVistaPrevia(
+    datos: DatosDia,
+  ): Pick<FilaVistaPrevia, 'porcentajesPorEje' | 'porcentajeLogro'> {
+    return {
+      porcentajesPorEje: datos.porcentajesPorEje,
+      porcentajeLogro: datos.porcentajeLogro,
+    };
+  }
+
+  protected async guardarFilas(
+    filasAprobadas: FilaAprobada<DatosDia>[],
     curso: CursoDocument,
     anio: number,
     cargaId: Types.ObjectId,
     meta: MetaDia,
   ): Promise<void> {
-    
     await Promise.all(
       filasAprobadas.map(({ filaOriginal, alumnoId }) =>
         this.evaluacionesService.guardarResultado({
           alumnoId: new Types.ObjectId(alumnoId),
           tipoEvaluacionId: meta.tipoId,
-          cursoId: curso._id as Types.ObjectId,
+          cursoId: curso._id,
           anio,
           momento: meta.momento,
           area: meta.area as Area,

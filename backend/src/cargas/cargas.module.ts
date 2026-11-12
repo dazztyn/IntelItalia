@@ -8,6 +8,7 @@ import { CargasService } from './cargas.service';
 import { Carga, CargaSchema } from './schemas/carga.schema';
 import { CargasRepository } from './repositorios/cargas.repository';
 import { MongooseCargasRepository } from './repositorios/mongoose-cargas.repository';
+import { DiaEstrategia } from './estrategias/dia.estrategia';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { MongooseCargasRepository } from './repositorios/mongoose-cargas.reposit
   controllers: [CargasController],
   providers: [
     CargasService,
+    DiaEstrategia,
     { provide: CargasRepository, useClass: MongooseCargasRepository },
   ],
   exports: [CargasService],

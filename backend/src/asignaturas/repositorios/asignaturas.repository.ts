@@ -6,6 +6,7 @@ export abstract class AsignaturasRepository {
   abstract listar(): Promise<AsignaturaDocument[]>;
   abstract listarPorArea(area: Area): Promise<AsignaturaDocument[]>;
   abstract buscarPorCodigo(codigo: string): Promise<AsignaturaDocument | null>;
+  abstract buscarPorCodigos(codigos: string[]): Promise<AsignaturaDocument[]>;
   abstract buscarPorNombre(
     nombreNormalizado: string,
     entreIds?: Types.ObjectId[],

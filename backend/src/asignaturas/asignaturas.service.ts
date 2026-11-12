@@ -25,6 +25,10 @@ export class AsignaturasService implements OnModuleInit {
     return this.asignaturasRepo.buscarPorCodigo(codigo);
   }
 
+  buscarPorCodigos(codigos: string[]): Promise<AsignaturaDocument[]> {
+    return this.asignaturasRepo.buscarPorCodigos(codigos);
+  }
+
   buscarPorNombre(
     nombre: string,
     entreIds?: Types.ObjectId[],

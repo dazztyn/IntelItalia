@@ -11,7 +11,7 @@ import {
   CLIENTE_OAUTH_GOOGLE,
   VerificadorGoogleService,
 } from './servicios/verificador-google.service';
-import { EXTRACTOR_SESION_HTTP } from 'src/comun/autorizacion';
+import { EXTRACTOR_SESION_HTTP } from '../comun/autorizacion';
 
 @Global()
 @Module({

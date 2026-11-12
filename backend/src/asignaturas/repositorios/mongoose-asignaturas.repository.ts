@@ -28,6 +28,11 @@ export class MongooseAsignaturasRepository extends AsignaturasRepository {
       .exec();
   }
 
+  buscarPorCodigos(codigos: string[]): Promise<AsignaturaDocument[]> {
+    const normalizados = codigos.map((c) => c.trim().toUpperCase());
+    return this.asignaturaModel.find({ codigo: { $in: normalizados } }).exec();
+  }
+
   buscarPorNombre(
     nombreNormalizado: string,
     entreIds?: Types.ObjectId[],
