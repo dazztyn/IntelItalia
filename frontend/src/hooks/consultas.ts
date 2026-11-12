@@ -26,6 +26,3 @@ export function useFicha(alumnoId: string) {
     staleTime: Infinity,
   })
 }
-export function useCargas() {
-  return useQuery({ queryKey: ['cargas'], queryFn: listarCargas })
-}
