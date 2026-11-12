@@ -23,14 +23,14 @@ export function FichaAlumno() {
     <button
       type="button"
       onClick={() => navegar(-1)}
-      className="mb-4 text-sm font-medium text-italia-verde hover:underline dark:text-emerald-400"
+      className="mb-4 text-sm font-medium text-verde-texto hover:underline dark:text-emerald-400"
     >
       ← Volver
     </button>
   )
 
   if (ficha.isPending) {
-    return <p className="text-center text-tinta/60 dark:text-italia-blanco/60">Cargando ficha…</p>
+    return <p className="text-center text-secundario">Cargando ficha…</p>
   }
   if (ficha.isError) {
     return (
@@ -50,14 +50,14 @@ export function FichaAlumno() {
       <h1 className="text-2xl font-semibold">
         {alumno.nombres} {alumno.apellidoPaterno} {alumno.apellidoMaterno ?? ''}
       </h1>
-      <p className="mt-1 text-sm text-tinta/60 dark:text-italia-blanco/60">
+      <p className="mt-1 text-sm text-secundario">
         {matriculaActual?.curso.nombre ?? 'Sin curso'} · {matriculaActual?.anio}
         {alumno.rut && ` · RUT ${formatoRut(alumno.rut)}`}
       </p>
 
       <h2 className="mt-8 font-semibold">Evaluaciones externas</h2>
       {alumno.evaluaciones.length === 0 ? (
-        <p className="mt-2 text-sm text-tinta/60 dark:text-italia-blanco/60">
+        <p className="mt-2 text-sm text-secundario">
           Todavía no hay resultados cargados.
         </p>
       ) : (

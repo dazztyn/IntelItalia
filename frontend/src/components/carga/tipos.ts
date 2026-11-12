@@ -7,17 +7,16 @@ export type EstadoArchivo =
       tipo: 'listo'
       archivo: File
       filas: number
-      /** Filas `ambiguo` o `noEncontrado`: el usuario elige al alumno o las descarta. */
       dudosas: FilaVistaPrevia[]
-      /** Alumnos ya identificados en el archivo: no se ofrecen de nuevo (el backend rechaza repetidos). */
       ocupados: string[]
-      /** Filas con porcentajes inválidos: no se pueden resolver y no se guardan. */
       errores: number
-      /** `{ "<fila>": alumnoId | null }`, como lo recibe POST /api/cargas. */
       resoluciones: Record<string, string | null>
     }
   | { tipo: 'invalido'; archivo: File; mensaje: string }
   | { tipo: 'guardado'; resultado: ResumenCarga }
+  | { tipo: 'previo'; carga: ResumenCarga }
+
+export type EstadoPestana = 'completo' | 'pendiente'
 
 export interface ResumenCurso {
   curso: string

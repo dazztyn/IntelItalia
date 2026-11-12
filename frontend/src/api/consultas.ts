@@ -1,5 +1,6 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, useQuery } from '@tanstack/react-query'
 import { ErrorApi } from './cliente'
+import { listarCargas } from './cargas'
 
 export const clienteConsultas = new QueryClient({
   defaultOptions: {
@@ -11,3 +12,6 @@ export const clienteConsultas = new QueryClient({
     },
   },
 })
+export function useCargas() {
+  return useQuery({ queryKey: ['cargas'], queryFn: listarCargas })
+}

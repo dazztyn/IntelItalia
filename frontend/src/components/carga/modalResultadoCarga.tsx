@@ -28,7 +28,7 @@ export function ModalResultadoCarga({ resumen, alCerrar }: Props) {
         aria-modal="true"
         aria-labelledby="titulo-resultado"
         className={`relative w-full max-w-lg rounded-xl p-6 text-white shadow-2xl transition duration-200 starting:scale-95 starting:opacity-0 ${
-          exito ? 'bg-linear-to-br from-italia-verde to-green-900' : 'bg-italia-rojo'
+          exito ? 'bg-linear-to-br from-verde-fondo to-green-900' : 'bg-italia-rojo'
         }`}
       >
         <h2 id="titulo-resultado" className="text-xl font-semibold">
@@ -47,7 +47,7 @@ export function ModalResultadoCarga({ resumen, alCerrar }: Props) {
                     {item.resultado.filasOk} de {item.resultado.filasTotales} filas guardadas
                   </p>
                   {item.resultado.errores.length > 0 && (
-                    <ul className="mt-1 list-disc pl-5 text-white/80">
+                    <ul className="mt-1 list-disc pl-5 text-white/90">
                       {item.resultado.errores.slice(0, MAXIMO_ERRORES_POR_CURSO).map((error) => (
                         <li key={`${error.fila}-${error.campo}`}>
                           Fila {error.fila}: {error.mensaje}
@@ -72,7 +72,7 @@ export function ModalResultadoCarga({ resumen, alCerrar }: Props) {
             autoFocus
             onClick={alCerrar}
             className={`rounded-md bg-white px-4 py-2 font-semibold transition-colors hover:bg-italia-blanco ${
-              exito ? 'text-italia-verde' : 'text-italia-rojo'
+              exito ? 'text-verde-texto' : 'text-italia-rojo'
             }`}
           >
             Entendido

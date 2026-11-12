@@ -11,10 +11,10 @@ interface PropsTarjeta {
 
 function Tarjeta({ titulo, valor, detalle }: PropsTarjeta) {
   return (
-    <div className="rounded-xl bg-linear-to-br from-italia-verde to-green-900 p-5 text-white shadow-sm">
-      <p className="text-sm text-white/80">{titulo}</p>
+    <div className="rounded-xl bg-linear-to-br from-verde-fondo to-green-900 p-5 text-white shadow-sm">
+      <p className="text-sm text-white/90">{titulo}</p>
       <p className="mt-1 text-3xl font-semibold tabular-nums">{valor}</p>
-      <p className="mt-1 text-xs text-white/70">{detalle}</p>
+      <p className="mt-1 text-xs text-white/90">{detalle}</p>
     </div>
   )
 }
@@ -63,7 +63,7 @@ export function DashboardDesempeno() {
                 <li key={color}>
                   <div className="flex justify-between text-sm">
                     <span>{SEMAFOROS[color].etiqueta}</span>
-                    <span className="tabular-nums text-tinta/70 dark:text-italia-blanco/70">
+                    <span className="tabular-nums text-secundario">
                       {cantidad}
                     </span>
                   </div>
@@ -79,7 +79,7 @@ export function DashboardDesempeno() {
           </ul>
         </section>
 
-        <section className="flex min-h-48 flex-col items-center justify-center rounded-xl border-2 border-dashed border-tinta/20 p-5 text-center text-tinta/60 dark:border-white/20 dark:text-italia-blanco/60">
+        <section className="flex min-h-48 flex-col items-center justify-center rounded-xl border-2 border-dashed border-tinta/20 p-5 text-center text-secundario dark:border-white/20 dark:text-italia-blanco/60">
           <p className="font-semibold">Evolución por semestre</p>
           <p className="mt-1 text-sm">Próximamente: promedios y asistencia en el tiempo.</p>
         </section>

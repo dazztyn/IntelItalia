@@ -31,7 +31,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Pendiente',
         barra: 'border-t-amber-400',
-        insignia: 'bg-amber-100 text-amber-800',
+        insignia: 'bg-amber-300 text-amber-950',
         flecha: 'text-amber-500',
         detalle: 'Sin archivo',
       }
@@ -39,7 +39,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Revisando…',
         barra: 'border-t-slate-300',
-        insignia: 'bg-slate-100 text-slate-700',
+        insignia: 'bg-slate-200 text-slate-800',
         flecha: 'text-slate-400',
         detalle: estado.archivo.name,
       }
@@ -56,14 +56,14 @@ function apariencia(estado: EstadoArchivo): Apariencia {
         ? {
             etiqueta: 'Por resolver',
             barra: 'border-t-amber-400',
-            insignia: 'bg-amber-100 text-amber-800',
+            insignia: 'bg-amber-300 text-amber-950',
             flecha: 'text-amber-500',
             detalle,
           }
         : {
             etiqueta: 'Listo',
             barra: 'border-t-emerald-500',
-            insignia: 'bg-emerald-100 text-emerald-800',
+            insignia: 'bg-emerald-700 text-white',
             flecha: 'text-emerald-600',
             detalle,
           }
@@ -72,7 +72,7 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       return {
         etiqueta: 'Revisar archivo',
         barra: 'border-t-red-500',
-        insignia: 'bg-red-100 text-red-800',
+        insignia: 'bg-red-700 text-white',
         flecha: 'text-red-600',
         detalle: estado.mensaje,
       }
@@ -80,12 +80,22 @@ function apariencia(estado: EstadoArchivo): Apariencia {
       const { estado: resultado, filasOk, filasTotales } = estado.resultado
       const detalle = `${filasOk} de ${filasTotales} filas guardadas`
       if (resultado === 'completada') {
-        return { etiqueta: 'Guardado', barra: 'border-t-emerald-500', insignia: 'bg-emerald-100 text-emerald-800', flecha: 'text-emerald-600', detalle }
+        return { etiqueta: 'Guardado', barra: 'border-t-emerald-500', insignia: 'bg-emerald-700 text-white', flecha: 'text-emerald-600', detalle }
       }
       if (resultado === 'completadaConErrores') {
-        return { etiqueta: 'Guardado con errores', barra: 'border-t-amber-400', insignia: 'bg-amber-100 text-amber-800', flecha: 'text-amber-500', detalle }
+        return { etiqueta: 'Guardado con errores', barra: 'border-t-amber-400', insignia: 'bg-amber-300 text-amber-950', flecha: 'text-amber-500', detalle }
       }
-      return { etiqueta: 'No se guardó', barra: 'border-t-red-500', insignia: 'bg-red-100 text-red-800', flecha: 'text-red-600', detalle }
+      return { etiqueta: 'No se guardó', barra: 'border-t-red-500', insignia: 'bg-red-700 text-white', flecha: 'text-red-600', detalle }
+    }
+        case 'previo': {
+      const fecha = new Date(estado.carga.finalizadaEn).toLocaleDateString('es-CL')
+      return {
+        etiqueta: 'Cargado',
+        barra: 'border-t-emerald-500',
+        insignia: 'bg-emerald-700 text-white',
+        flecha: 'text-emerald-600',
+        detalle: `${estado.carga.filasOk} de ${estado.carga.filasTotales} filas · ${fecha}`,
+      }
     }
   }
 }
@@ -99,7 +109,6 @@ interface PropsFilasDudosas {
   alResolver: Props['alResolver']
 }
 
-/** Una fila por nombre que no se pudo identificar: el usuario elige al alumno o la descarta. */
 function FilasDudosas({ cursoId, dudosas, ocupados, resoluciones, deshabilitada, alResolver }: PropsFilasDudosas) {
   const hayNoEncontrados = dudosas.some((fila) => fila.estado === 'noEncontrado')
   const alumnos = useAlumnosDeCurso(hayNoEncontrados ? cursoId : null)
@@ -117,7 +126,7 @@ function FilasDudosas({ cursoId, dudosas, ocupados, resoluciones, deshabilitada,
           <li key={fila.fila} className="flex flex-col gap-1">
             <span className="font-medium">
               {fila.nombre}{' '}
-              <span className="font-normal text-tinta/60 dark:text-italia-blanco/60">
+              <span className="font-normal text-secundario">
                 ({fila.estado === 'ambiguo' ? 'varios coinciden' : 'no está en el curso'})
               </span>
             </span>
@@ -163,7 +172,7 @@ export function TarjetaCurso({ curso, estado, deshabilitada, alElegirArchivo, al
         </span>
       </div>
 
-      <p className="min-h-10 text-sm text-tinta/60 dark:text-italia-blanco/60">{vista.detalle}</p>
+      <p className="min-h-10 text-sm text-secundario">{vista.detalle}</p>
 
       {estado.tipo === 'listo' && estado.dudosas.length > 0 && (
         <FilasDudosas

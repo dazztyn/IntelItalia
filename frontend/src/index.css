@@ -1,22 +1,41 @@
 @import 'tailwindcss';
 
+/* Modo oscuro por clase: el botón de tema agrega o quita `dark` en <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Paleta de la escuela */
+/* Paleta de la escuela. Tailwind crea las clases solas: bg-italia-verde, text-tinta… */
 @theme {
   --color-italia-verde: #008c45;
   --color-italia-blanco: #f4f5f0;
   --color-italia-rojo: #cd212a;
   --color-tinta: #0f2a1d;
   --color-noche: #0b1310;
+  --color-verde-texto: #006b35;
+  --color-verde-fondo: #007a3d;
+  --color-secundario: #3d5247;
 }
 
 @layer base {
   html.dark {
     color-scheme: dark;
+    --color-secundario: #d8dbd4;
   }
 
   body {
     @apply bg-italia-blanco text-tinta dark:bg-noche dark:text-italia-blanco;
+  }
+
+  [data-leyendo] {
+    background-color: var(--color-yellow-200) !important;
+    color: var(--color-tinta) !important;
+    @apply rounded-sm outline-2 outline-offset-2 outline-tinta;
+  }
+  html.modo-senalar
+    :is(h1, h2, h3, h4, h5, h6, p, li, th, td, dt, dd, label, legend, caption, figcaption, button, a, summary, select, [role='img']):not([data-no-leer], [data-no-leer] *):hover {
+    @apply rounded-sm outline-2 outline-offset-2 outline-dashed outline-current;
+  }
+  html.modo-senalar
+    :is(h1, h2, h3, h4, h5, h6, p, li, th, td, dt, dd, label, legend, caption, figcaption, button, a, summary, select, [role='img']):not([data-no-leer], [data-no-leer] *):hover {
+    @apply rounded-sm outline-2 outline-offset-2 outline-dashed outline-verde-texto;
   }
 }

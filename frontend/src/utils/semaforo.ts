@@ -3,7 +3,7 @@ import type { Semaforo } from '../api/types'
 export const SEMAFOROS: Record<Semaforo, { etiqueta: string; insignia: string; barra: string }> = {
   verde: {
     etiqueta: 'Sin alertas',
-    insignia: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200',
+    insignia: 'bg-emerald-700 text-white dark:bg-emerald-900/60 dark:text-emerald-200',
     barra: 'bg-emerald-500',
   },
   amarillo: {
@@ -18,7 +18,7 @@ export const SEMAFOROS: Record<Semaforo, { etiqueta: string; insignia: string; b
   },
   rojo: {
     etiqueta: 'Crítico',
-    insignia: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
+    insignia: 'bg-red-700 text-white dark:bg-red-900/50 dark:text-red-200',
     barra: 'bg-red-600',
   },
 }
