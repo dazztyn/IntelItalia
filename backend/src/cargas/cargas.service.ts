@@ -8,88 +8,79 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { isObjectIdOrHexString, Types } from 'mongoose';
 import { AlumnosService } from '../alumnos/alumnos.service';
 import type { UsuarioAutorizado } from '../comun/autorizacion';
-import { CursoDocument } from '../cursos/curso.schema';
 import { CursosService } from '../cursos/cursos.service';
-import { nombreCurso } from '../cursos/niveles';
-import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
+import { Nivel, nombreCurso } from '../cursos/niveles';
 import { tieneAccesoACurso } from '../usuarios/alcance';
 import { CargaDto, ConfirmarCargaDto } from './dto/carga.dto';
-import { FormatoInvalidoError, parsearDia } from './parsers/dia.parser';
-import { CargaDocument, ErrorFila } from './schemas/carga.schema';
-import { CargasRepository } from './repositorios/cargas.repository';
 import { ArchivoSubido } from './interfaces/archivo-subido.interface';
-import {
-  FilaVistaPrevia,
-  VistaPrevia,
-} from './interfaces/vista-previa.interface';
-import { FilaDia } from './interfaces/archivo-dia.interface';
+import { EstadoFila, FilaVistaPrevia, VistaPrevia } from './interfaces/vista-previa.interface';
+import { CargasRepository } from './repositorios/cargas.repository';
+import { EstrategiaCarga, FilaExtraida } from './estrategias/estrategia-carga.interface';
+import { DiaEstrategia } from './estrategias/dia.estrategia';
+import { CargaDocument, ErrorFila } from './schemas/carga.schema';
+import { claveNombre } from 'src/comun/texto';
 
-// Carga del DIA (docs/ARQUITECTURA.md, sección 6). Se procesa dentro de la petición:
-// un archivo trae ~25 filas. shortcut: sin BullMQ ni avance por partes; pasar a la
-// cola `procesarCarga` cuando lleguen archivos grandes (Mi Aula de toda la escuela).
 @Injectable()
 export class CargasService {
+  // El mapa donde registraremos todas las estrategias (DIA, Letrapps, MiAula...)
+  private readonly estrategias = new Map<string, EstrategiaCarga>();
+
   constructor(
     private readonly cargasRepo: CargasRepository,
     private readonly cursosService: CursosService,
     private readonly alumnosService: AlumnosService,
-    private readonly evaluacionesService: EvaluacionesService,
+    private readonly diaEstrategia: DiaEstrategia,
     private readonly eventos: EventEmitter2,
-  ) {}
+  ) {
+    // Registramos la estrategia en el orquestador
+    this.estrategias.set(this.diaEstrategia.fuente, this.diaEstrategia);
+  }
 
-  /** Lee el archivo e identifica a cada alumno, sin guardar nada. */
-  async previsualizar(
-    archivo: ArchivoSubido,
-    dto: CargaDto,
-    usuario: UsuarioAutorizado,
-  ): Promise<VistaPrevia> {
+  private obtenerEstrategia(fuente: string): EstrategiaCarga {
+    const estrategia = this.estrategias.get(fuente);
+    if (!estrategia) {
+      throw new BadRequestException(`Fuente de carga no soportada: ${fuente}`);
+    }
+    return estrategia;
+  }
+
+  async previsualizar(archivo: ArchivoSubido, dto: CargaDto, usuario: UsuarioAutorizado): Promise<VistaPrevia> {
     const { vistaPrevia } = await this.analizar(archivo, dto, usuario);
     return vistaPrevia;
   }
 
-  /**
-   * Vuelve a leer el mismo archivo, aplica lo que el usuario resolvió en la vista
-   * previa y guarda los resultados. Recargar el archivo actualiza, no duplica.
-   */
-  async confirmar(
-    archivo: ArchivoSubido,
-    dto: ConfirmarCargaDto,
-    usuario: UsuarioAutorizado,
-    ip: string,
-  ) {
+  async confirmar(archivo: ArchivoSubido, dto: ConfirmarCargaDto, usuario: UsuarioAutorizado, ip: string) {
+    const estrategia = this.obtenerEstrategia(dto.fuente);
     const resoluciones = leerResoluciones(dto.resoluciones);
     const iniciadaEn = new Date();
-    const { vistaPrevia, curso, tipoId } = await this.analizar(
-      archivo,
-      dto,
-      usuario,
-    );
+    
+    // analizamos el archivo usando la estrategia genérica
+    const { vistaPrevia, curso, meta, filasExtraidas } = await this.analizar(archivo, dto, usuario);
 
     const matriculados = new Set(
-      (
-        await this.alumnosService.listarPorCurso(curso._id, vistaPrevia.anio)
-      ).map((alumno) => String(alumno._id)),
+      (await this.alumnosService.listarPorCurso(curso._id as Types.ObjectId, vistaPrevia.anio))
+        .map((alumno) => String(alumno._id)),
     );
+    
     const cargaId = new Types.ObjectId();
     const errores: ErrorFila[] = [];
     const guardados = new Set<string>();
+    const filasAprobadas: Array<{ filaOriginal: FilaExtraida; alumnoId: string }> = [];
 
+    // Validamos y aprobamos filas
     for (const fila of vistaPrevia.filas) {
-      const error = (campo: string, mensaje: string) =>
-        errores.push({ fila: fila.fila, campo, mensaje });
+      const error = (campo: string, mensaje: string) => errores.push({ fila: fila.fila, campo, mensaje });
 
       if (fila.estado === 'error') {
-        error('porcentajes', fila.mensaje ?? 'Fila inválida');
+        error('datos', fila.mensaje ?? 'Fila inválida');
         continue;
       }
       if (fila.estado === 'sinResultado') continue;
 
       const resuelta = String(fila.fila) in resoluciones;
-      const alumnoId = resuelta
-        ? resoluciones[String(fila.fila)]
-        : fila.alumnoId;
+      const alumnoId = resuelta ? resoluciones[String(fila.fila)] : fila.alumnoId;
+      
       if (alumnoId === null) {
-        // `null` en las resoluciones = el usuario descartó la fila.
         if (!resuelta) {
           error(
             'nombre',
@@ -100,6 +91,7 @@ export class CargasService {
         }
         continue;
       }
+      
       if (resuelta && !matriculados.has(alumnoId)) {
         error('nombre', 'El alumno elegido no está matriculado en el curso');
         continue;
@@ -109,38 +101,29 @@ export class CargasService {
         continue;
       }
 
-      await this.evaluacionesService.guardarResultado({
-        alumnoId: new Types.ObjectId(alumnoId),
-        tipoEvaluacionId: tipoId,
-        cursoId: curso._id,
-        anio: vistaPrevia.anio,
-        momento: vistaPrevia.momento,
-        area: vistaPrevia.area,
-        resultados: {
-          porcentajesPorEje: fila.porcentajesPorEje,
-          porcentajeLogro: fila.porcentajeLogro,
-        },
-        nivelNormalizado: null, // ⏳ cortes del DIA por definir (sección 4.3)
-        cargaId,
-      });
-      guardados.add(alumnoId);
+      // Asociamos la fila parseada original con el alumno válido
+      const filaOriginal = filasExtraidas.find(f => f.fila === fila.fila);
+      if (filaOriginal) {
+        filasAprobadas.push({ filaOriginal, alumnoId });
+        guardados.add(alumnoId);
+      }
+    }
+
+    // DELEGAMOS EL GUARDADO A LA ESTRATEGIA (Si hay aprobados)
+    if (filasAprobadas.length > 0) {
+      await estrategia.guardar(filasAprobadas, curso, vistaPrevia.anio, cargaId, meta);
     }
 
     const carga = await this.cargasRepo.crear({
       _id: cargaId,
-      fuente: dto.fuente,
+      fuente: dto.fuente as any, // TypeScript compatibility with mongoose schema enum
       nombreArchivo: archivo.originalname.slice(0, 200),
       usuarioId: usuario.id,
-      cursoId: curso._id,
+      cursoId: curso._id as Types.ObjectId,
       anio: vistaPrevia.anio,
       momento: vistaPrevia.momento,
       area: vistaPrevia.area,
-      estado:
-        errores.length === 0
-          ? 'completada'
-          : guardados.size === 0
-            ? 'fallida'
-            : 'completadaConErrores',
+      estado: errores.length === 0 ? 'completada' : guardados.size === 0 ? 'fallida' : 'completadaConErrores',
       filasTotales: vistaPrevia.filas.length,
       filasOk: guardados.size,
       errores,
@@ -160,7 +143,6 @@ export class CargasService {
     return detalleCarga(carga);
   }
 
-  // shortcut: últimas 50 cargas sin paginar ni filtrar; agregar filtros cuando haya muchas.
   async listar() {
     const cargas = await this.cargasRepo.listarRecientes(50);
     return cargas.map(resumenCarga);
@@ -172,112 +154,82 @@ export class CargasService {
     return detalleCarga(carga);
   }
 
-  private async analizar(
-    archivo: ArchivoSubido,
-    dto: CargaDto,
-    usuario: UsuarioAutorizado,
-  ) {
-    const tipo = await this.evaluacionesService.buscarTipoPorCodigo('DIA');
-    if (!tipo) throw new Error('Falta el tipo de evaluación DIA');
-    if (!tipo.momentos.includes(dto.momento)) {
-      throw new BadRequestException(
-        `momento inválido; usar: ${tipo.momentos.join(', ')}`,
-      );
-    }
-
-    let dia: Awaited<ReturnType<typeof parsearDia>>;
-    try {
-      dia = await parsearDia(archivo.buffer);
-    } catch (error) {
-      if (error instanceof FormatoInvalidoError) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
+  private async analizar(archivo: ArchivoSubido, dto: CargaDto, usuario: UsuarioAutorizado) {
+    const estrategia = this.obtenerEstrategia(dto.fuente);
+    
+    // DELEGAMOS EL PARSEO A LA ESTRATEGIA
+    const parseado = await estrategia.parsear(archivo, dto);
 
     const resultado = await this.cursosService.resolverCurso(
-      dia.anio,
-      dia.nivel,
-      dia.letra,
+      parseado.anio,
+      parseado.nivel as Nivel,
+      parseado.letra,
     );
+    
     if (resultado.estado !== 'encontrado') {
-      const nombre = nombreCurso(dia.nivel, dia.letra);
+      const nombre = nombreCurso(parseado.nivel as Nivel, parseado.letra);
       throw new BadRequestException(
         resultado.estado === 'noExiste'
-          ? `No existe el curso ${nombre} en ${dia.anio}`
-          : `Hay varios cursos de ${nombre} en ${dia.anio} y la letra del archivo no coincide con ninguno`,
+          ? `No existe el curso ${nombre} en ${parseado.anio}`
+          : `Hay varios cursos de ${nombre} en ${parseado.anio} y la letra del archivo no coincide con ninguno`,
       );
     }
+    
     const curso = resultado.curso;
-    // Alcance por curso (sección 6.2): el archivo es de un solo curso.
-    if (!tieneAccesoACurso(usuario, curso._id)) {
+    if (!tieneAccesoACurso(usuario, curso._id as Types.ObjectId)) {
       throw new ForbiddenException('El curso del archivo no está asignado');
     }
 
-    const filas = await Promise.all(
-      dia.filas.map((fila) => this.identificar(fila, curso, dia.anio)),
-    );
+    // AQUI TAMBIEN IMPLEMENTAMOS LA OPTIMIZACION O(1) EN MEMORIA EN VEZ DE CONSULTAR MONGODB EN UN BUCLE
+    const matriculados = await this.alumnosService.listarPorCurso(curso._id as Types.ObjectId, parseado.anio);
+    
+    const filas = parseado.filas.map((fila) => this.identificar(fila, matriculados));
+    
     const vistaPrevia: VistaPrevia = {
       curso: { id: String(curso._id), nombre: curso.nombre },
-      anio: dia.anio,
-      area: dia.area,
+      anio: parseado.anio,
+      area: parseado.area as 'lenguaje' | 'matematica',
       momento: dto.momento,
-      ejes: dia.ejes,
+      ejes: parseado.ejes,
       filas,
     };
-    return { vistaPrevia, curso, tipoId: tipo._id };
+    
+    return { vistaPrevia, curso, meta: parseado.meta, filasExtraidas: parseado.filas };
   }
 
-  /** Busca al alumno por nombre entre los matriculados del curso (sección 6.2). */
-  private async identificar(
-    fila: FilaDia,
-    curso: CursoDocument,
-    anio: number,
-  ): Promise<FilaVistaPrevia> {
+  // Ahora cruza nombres usando el arreglo en memoria en tiempo O(1) en vez de pegarle a Mongo
+  private identificar(fila: FilaExtraida, matriculados: any[]): FilaVistaPrevia {
     const base = {
       fila: fila.fila,
       numeroLista: fila.numeroLista,
       nombre: fila.nombre,
-      porcentajesPorEje: fila.porcentajesPorEje,
-      porcentajeLogro: fila.porcentajeLogro,
+      porcentajesPorEje: fila.datos?.porcentajesPorEje ?? null,
+      porcentajeLogro: fila.datos?.porcentajeLogro ?? null,
       alumnoId: null,
       candidatos: [],
     };
+    
     if (fila.error) return { ...base, estado: 'error', mensaje: fila.error };
-    if (!fila.porcentajesPorEje) return { ...base, estado: 'sinResultado' };
+    if (fila.sinResultado) return { ...base, estado: 'sinResultado' };
 
-    const encontrados = await this.alumnosService.buscarPorNombreEnCurso(
-      fila.nombre,
-      curso._id,
-      anio,
-    );
+    // Búsqueda en memoria
+    const nombreNormalizadoFila = claveNombre(fila.nombre); // Reemplaza por tu función `claveNombre`
+    const encontrados = matriculados.filter(a => a.nombreNormalizado === nombreNormalizadoFila);
+    
     const candidatos = encontrados.map((alumno) => ({
       id: String(alumno._id),
-      nombreCompleto: [
-        alumno.nombres,
-        alumno.apellidoPaterno,
-        alumno.apellidoMaterno,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      nombreCompleto: [alumno.nombres, alumno.apellidoPaterno, alumno.apellidoMaterno].filter(Boolean).join(' '),
     }));
+    
     if (candidatos.length === 1) {
-      return {
-        ...base,
-        estado: 'encontrado',
-        alumnoId: candidatos[0].id,
-        candidatos,
-      };
+      return { ...base, estado: 'encontrado', alumnoId: candidatos[0].id, candidatos };
     }
-    return {
-      ...base,
-      estado: candidatos.length === 0 ? 'noEncontrado' : 'ambiguo',
-      candidatos,
-    };
+    
+    return { ...base, estado: candidatos.length === 0 ? 'noEncontrado' : 'ambiguo', candidatos };
   }
 }
 
-/** `{ "<fila>": "<alumnoId>" | null }`; cualquier otra forma es un 400. */
+// Funciones utilitarias al fondo del archivo
 function leerResoluciones(json?: string): Record<string, string | null> {
   if (!json) return {};
   let valor: unknown;
@@ -291,13 +243,10 @@ function leerResoluciones(json?: string): Record<string, string | null> {
     valor !== null &&
     !Array.isArray(valor) &&
     Object.entries(valor).every(
-      ([fila, id]) =>
-        /^\d+$/.test(fila) && (id === null || isObjectIdOrHexString(id)),
+      ([fila, id]) => /^\d+$/.test(fila) && (id === null || isObjectIdOrHexString(id)),
     );
   if (!esValido) {
-    throw new BadRequestException(
-      'resoluciones debe ser { "<fila>": "<alumnoId>" | null }',
-    );
+    throw new BadRequestException('resoluciones debe ser { "<fila>": "<alumnoId>" | null }');
   }
   return valor as Record<string, string | null>;
 }
@@ -322,10 +271,11 @@ function resumenCarga(carga: CargaDocument) {
 function detalleCarga(carga: CargaDocument) {
   return {
     ...resumenCarga(carga),
-    errores: carga.errores.map(({ fila, campo, mensaje }) => ({
-      fila,
-      campo,
-      mensaje,
-    })),
+    errores: carga.errores.map(({ fila, campo, mensaje }) => ({ fila, campo, mensaje })),
   };
+}
+
+// Helper auxiliar para simular claveNombre si no está importado globalmente
+function normalizarNombre(nombre: string): string {
+  return nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-ZÑ0-9]+/g, ' ').trim().split(' ').sort().join(' ');
 }

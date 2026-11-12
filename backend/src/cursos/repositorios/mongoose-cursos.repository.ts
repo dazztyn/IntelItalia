@@ -37,6 +37,10 @@ export class MongooseCursosRepository extends CursosRepository {
     return this.cursoModel.findById(id).exec();
   }
 
+  buscarPorIds(ids: Types.ObjectId[]): Promise<CursoDocument[]> {
+    return this.cursoModel.find({ _id: { $in: ids } }).exec();
+  }
+
   buscarPorAnioYNivel(anio: number, nivel: Nivel): Promise<CursoDocument[]> {
     return this.cursoModel.find({ anio, nivel }).exec();
   }

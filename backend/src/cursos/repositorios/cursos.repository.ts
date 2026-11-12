@@ -19,4 +19,5 @@ export abstract class CursosRepository {
     nivel: Nivel,
   ): Promise<CursoDocument[]>;
   abstract listarNivelesConCursoEnAnio(anio: number): Promise<Nivel[]>;
+  abstract buscarPorIds(ids: Types.ObjectId[]): Promise<CursoDocument[]>;
 }

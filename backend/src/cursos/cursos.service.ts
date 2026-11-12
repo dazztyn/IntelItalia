@@ -74,6 +74,10 @@ export class CursosService {
     return this.cursosRepo.buscarPorId(id);
   }
 
+  buscarPorIds(ids: Types.ObjectId[]): Promise<CursoDocument[]> {
+    return this.cursosRepo.buscarPorIds(ids);
+  }
+
   async resolverCurso(
     anio: number,
     nivel: Nivel,

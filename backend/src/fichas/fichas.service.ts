@@ -36,24 +36,36 @@ export class FichasService {
       throw new ForbiddenException('El alumno no está en sus cursos');
     }
 
-    const [matriculas, evaluaciones, pie] = await Promise.all([
-      Promise.all(
-        [...alumno.matriculas]
-          .sort((a, b) => b.anio - a.anio)
-          .map(async ({ anio, estado, cursoId }) => {
-            const curso = await this.cursosService.buscarPorId(cursoId);
-            return {
-              anio,
-              estado,
-              curso: { id: String(cursoId), nombre: curso?.nombre ?? null },
-            };
-          }),
-      ),
+    // 1. Extraemos los IDs de los cursos sin duplicados
+    const idsCursosUnicos = [
+      ...new Set(alumno.matriculas.map((m) => String(m.cursoId))),
+    ].map((idTexto) => new Types.ObjectId(idTexto));
+
+    // 2. Traemos TODOS los cursos en un solo viaje a Mongoose
+    const cursosBD = await this.cursosService.buscarPorIds(idsCursosUnicos);
+
+    // 3. Creamos un diccionario en memoria O(1)
+    const mapaCursos = new Map(cursosBD.map((c) => [String(c._id), c.nombre]));
+
+    // 4. Mapeamos las matrículas instantáneamente (sin async/await dentro del loop)
+    const matriculas = [...alumno.matriculas]
+      .sort((a, b) => b.anio - a.anio)
+      .map(({ anio, estado, cursoId }) => ({
+        anio,
+        estado,
+        curso: {
+          id: String(cursoId),
+          nombre: mapaCursos.get(String(cursoId)) ?? null,
+        },
+      }));
+
+    // 5. Hacemos el Promise.all SOLO para las evaluaciones (y el PIE si aplica)
+    const [evaluaciones, pie] = await Promise.all([
       this.evaluacionesService.listarPorAlumno(id),
       // Dato sensible: solo con `pie.ver` (sección 8.2).
       usuario.permisos.includes('pie.ver')
         ? this.alumnosService.obtenerDatosPie(id)
-        : undefined,
+        : Promise.resolve(undefined),
     ]);
 
     this.auditar(usuario, id, ip, 'ficha.ver');
