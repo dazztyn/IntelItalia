@@ -11,6 +11,10 @@ export abstract class AlumnosRepository {
     cursoId: Types.ObjectId,
     anio: number,
   ): Promise<AlumnoDocument[]>;
+  abstract listarTodosPorCurso(
+    cursoId: Types.ObjectId,
+    anio: number,
+  ): Promise<AlumnoDocument[]>;
   abstract buscarPorNombreEnCurso(
     claveNombre: string,
     cursoId: Types.ObjectId,
@@ -19,4 +23,5 @@ export abstract class AlumnosRepository {
   abstract obtenerDatosPie(
     alumnoId: Types.ObjectId,
   ): Promise<DatosPie | undefined>;
+  
 }

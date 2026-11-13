@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Area, Asignatura, AsignaturaDocument } from '../asignatura.schema';
 import { AsignaturaCatalogo } from '../interfaces/asignatura-catalogo.interface';
 import { AsignaturasRepository } from './asignaturas.repository';
+import { normalizarTexto } from '../../comun/texto';
 
 @Injectable()
 export class MongooseAsignaturasRepository extends AsignaturasRepository {
@@ -46,10 +47,20 @@ export class MongooseAsignaturasRepository extends AsignaturasRepository {
   }
 
   async asegurarCatalogo(catalogo: AsignaturaCatalogo[]): Promise<number> {
-    const operaciones = catalogo.map((asignatura) => ({
+    const operaciones = catalogo.map(({ codigo, nombre, area, aliases }) => ({
       updateOne: {
-        filter: { codigo: asignatura.codigo },
-        update: { $setOnInsert: asignatura },
+        filter: { codigo },
+        update: {
+          $setOnInsert: {
+            codigo,
+            nombre,
+            area,
+            aliases,
+            nombresNormalizados: [
+              ...new Set([nombre, ...aliases].map(normalizarTexto)),
+            ],
+          },
+        },
         upsert: true,
       },
     }));

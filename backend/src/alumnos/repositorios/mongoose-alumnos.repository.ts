@@ -39,6 +39,16 @@ export class MongooseAlumnosRepository extends AlumnosRepository {
       .sort({ apellidoPaterno: 1, apellidoMaterno: 1, nombres: 1 })
       .exec();
   }
+  
+  listarTodosPorCurso(
+    cursoId: Types.ObjectId,
+    anio: number,
+  ): Promise<AlumnoDocument[]> {
+    return this.alumnoModel
+      .find({ matriculas: { $elemMatch: { cursoId, anio } } })
+      .sort({ apellidoPaterno: 1, apellidoMaterno: 1, nombres: 1 })
+      .exec();
+  }
 
   buscarPorNombreEnCurso(
     claveNombre: string,

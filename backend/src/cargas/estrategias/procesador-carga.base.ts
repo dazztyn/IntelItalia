@@ -67,8 +67,20 @@ export abstract class ProcesadorCargaBase<
     usuario: UsuarioAutorizado,
     cargaId: Types.ObjectId,
   ): Promise<ResultadoProcesamientoCarga> {
-    const { vistaPrevia, curso, meta, filasExtraidas, matriculadosIds } =
-      await this.analizar(archivo, dto, usuario);
+    const { vistaPrevia, curso, meta, filasExtraidas } = await this.analizar(
+      archivo,
+      dto,
+      usuario,
+    );
+
+    const matriculadosActivos = await this.alumnosService.listarPorCurso(
+      curso._id,
+      vistaPrevia.anio,
+    );
+    
+    const matriculadosIds = new Set(
+      matriculadosActivos.map((a) => String(a._id)),
+    );
 
     const mapaFilasOriginales = new Map(filasExtraidas.map((f) => [f.fila, f]));
     const errores: ErrorFila[] = [];
