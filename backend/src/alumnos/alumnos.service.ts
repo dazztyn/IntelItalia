@@ -33,6 +33,13 @@ export class AlumnosService {
     return this.alumnosRepo.listarPorCurso(cursoId, anio);
   }
 
+  listarTodosPorCurso(
+    cursoId: Types.ObjectId,
+    anio: number,
+  ): Promise<AlumnoDocument[]> {
+    return this.alumnosRepo.listarTodosPorCurso(cursoId, anio);
+  }
+
   buscarPorNombreEnCurso(
     nombreCompleto: string,
     cursoId: Types.ObjectId,

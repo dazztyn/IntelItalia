@@ -23,5 +23,4 @@ export abstract class AlumnosRepository {
   abstract obtenerDatosPie(
     alumnoId: Types.ObjectId,
   ): Promise<DatosPie | undefined>;
-  
 }

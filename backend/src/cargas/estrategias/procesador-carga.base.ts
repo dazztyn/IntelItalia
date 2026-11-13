@@ -77,7 +77,7 @@ export abstract class ProcesadorCargaBase<
       curso._id,
       vistaPrevia.anio,
     );
-    
+
     const matriculadosIds = new Set(
       matriculadosActivos.map((a) => String(a._id)),
     );
@@ -184,12 +184,12 @@ export abstract class ProcesadorCargaBase<
       throw new ForbiddenException('El curso del archivo no está asignado');
     }
 
-    // 1 sola consulta a BD y armado de índices O(1) en memoria
-    const alumnosCurso = await this.alumnosService.listarPorCurso(
+    // Incluye todas las matrículas del curso y año (activas, retiradas y trasladadas),
+    // igual que hacía buscarPorNombreEnCurso originalmente, pero en 1 sola consulta.
+    const alumnosCurso = await this.alumnosService.listarTodosPorCurso(
       curso._id,
       parseado.anio,
     );
-    const matriculadosIds = new Set(alumnosCurso.map((a) => String(a._id)));
     const mapaPorNombre = new Map<string, AlumnoDocument[]>();
 
     for (const alumno of alumnosCurso) {
@@ -216,7 +216,6 @@ export abstract class ProcesadorCargaBase<
       curso,
       meta: parseado.meta,
       filasExtraidas: parseado.filas,
-      matriculadosIds,
     };
   }
 
