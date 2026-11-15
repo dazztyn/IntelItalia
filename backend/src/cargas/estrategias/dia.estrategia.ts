@@ -13,21 +13,25 @@ import {
   FilaExtraida,
 } from './estrategia-carga.interface';
 import { DatosDia, MetaDia } from '../interfaces/estrategia-dia.interface';
-import { FilaVistaPrevia } from '../interfaces/vista-previa.interface';
+import { DatosFilaVistaPrevia } from '../interfaces/vista-previa.interface';
 import { FormatoInvalidoError, parsearDia } from '../parsers/dia.parser';
+import { AliasNombresRepository } from '../repositorios/alias-nombres.repository';
 import { FuenteCarga } from '../schemas/carga.schema';
 import { ProcesadorCargaBase } from './procesador-carga.base';
 
 @Injectable()
 export class DiaEstrategia extends ProcesadorCargaBase<DatosDia, MetaDia> {
   readonly fuente: FuenteCarga = 'dia';
+  readonly permiso = 'cargas.evaluaciones' as const;
+  readonly extension = '.xlsx';
 
   constructor(
     cursosService: CursosService,
     alumnosService: AlumnosService,
+    aliasRepo: AliasNombresRepository,
     private readonly evaluacionesService: EvaluacionesService,
   ) {
-    super(cursosService, alumnosService);
+    super(cursosService, alumnosService, aliasRepo);
   }
 
   protected async parsear(
@@ -78,10 +82,12 @@ export class DiaEstrategia extends ProcesadorCargaBase<DatosDia, MetaDia> {
     }
   }
 
-  protected armarDatosVistaPrevia(
-    datos: DatosDia,
-  ): Pick<FilaVistaPrevia, 'porcentajesPorEje' | 'porcentajeLogro'> {
+  protected armarDatosVistaPrevia(datos: DatosDia): DatosFilaVistaPrevia {
     return {
+      resultados: datos.porcentajesPorEje && {
+        porcentajesPorEje: datos.porcentajesPorEje,
+        porcentajeLogro: datos.porcentajeLogro,
+      },
       porcentajesPorEje: datos.porcentajesPorEje,
       porcentajeLogro: datos.porcentajeLogro,
     };

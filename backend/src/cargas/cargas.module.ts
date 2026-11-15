@@ -6,13 +6,19 @@ import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
 import { CargasController } from './cargas.controller';
 import { CargasService } from './cargas.service';
 import { Carga, CargaSchema } from './schemas/carga.schema';
+import { AliasNombre, AliasNombreSchema } from './schemas/alias-nombre.schema';
+import { AliasNombresRepository } from './repositorios/alias-nombres.repository';
+import { MongooseAliasNombresRepository } from './repositorios/mongoose-alias-nombres.repository';
 import { CargasRepository } from './repositorios/cargas.repository';
 import { MongooseCargasRepository } from './repositorios/mongoose-cargas.repository';
 import { DiaEstrategia } from './estrategias/dia.estrategia';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Carga.name, schema: CargaSchema }]),
+    MongooseModule.forFeature([
+      { name: Carga.name, schema: CargaSchema },
+      { name: AliasNombre.name, schema: AliasNombreSchema },
+    ]),
     CursosModule,
     AlumnosModule,
     EvaluacionesModule,
@@ -22,6 +28,10 @@ import { DiaEstrategia } from './estrategias/dia.estrategia';
     CargasService,
     DiaEstrategia,
     { provide: CargasRepository, useClass: MongooseCargasRepository },
+    {
+      provide: AliasNombresRepository,
+      useClass: MongooseAliasNombresRepository,
+    },
   ],
   exports: [CargasService],
 })
