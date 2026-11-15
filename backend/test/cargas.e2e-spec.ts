@@ -24,9 +24,14 @@ interface Fila {
   estado: string;
   alumnoId: string | null;
   candidatos: Array<{ id: string }>;
+  porAlias?: boolean;
+  resultados: Record<string, unknown> | null;
+  porcentajesPorEje: Record<string, number> | null;
+  porcentajeLogro: number | null;
 }
 interface Carga {
   id: string;
+  cursoId: string;
   estado: string;
   filasTotales: number;
   filasOk: number;
@@ -337,6 +342,102 @@ describe('Carga del DIA (e2e)', () => {
         if (registros < 3) await new Promise((r) => setTimeout(r, 50));
       }
       expect(registros).toBe(3);
+    });
+  });
+
+  // Van al final: dependen de lo que resolvieron los tests de arriba (filas 16 y 17).
+  describe('alias de nombres', () => {
+    const vistaPrevia = async (contenido?: Buffer, usuarioId = directoraId) =>
+      (
+        cuerpo(
+          await subir(
+            '/api/cargas/vista-previa',
+            usuarioId,
+            {},
+            contenido,
+          ).expect(200),
+        ) as { filas: Fila[] }
+      ).filas;
+    let archivoCuarto: Buffer;
+
+    beforeAll(async () => {
+      archivoCuarto = await crearDiaFicticio({
+        curso: '4 A',
+        filas: [[1, 'NOMBRE QUE NO EXISTE', 80, 80, 80]],
+      });
+    });
+
+    it('recuerda lo que se resolvió en una carga anterior', async () => {
+      const filas = await vistaPrevia();
+
+      expect(filas.map((f) => [f.estado, f.porAlias ?? false])).toEqual([
+        ['encontrado', false],
+        ['encontrado', false],
+        ['encontrado', true], // 16: antes ambiguo
+        ['encontrado', true], // 17: antes noEncontrado
+        ['sinResultado', false],
+      ]);
+      expect(filas[3].alumnoId).toBe(alumnoSinCoincidencia);
+
+      // Sin resoluciones: ya no hay nada que preguntar.
+      const carga = cuerpo(await subir('/api/cargas', directoraId).expect(201));
+      expect(carga).toMatchObject({ estado: 'completada', errores: [] });
+    });
+
+    it('entrega `resultados` y mantiene los campos del DIA', async () => {
+      const [fila] = await vistaPrevia();
+
+      expect(fila.resultados).toEqual({
+        porcentajesPorEje: fila.porcentajesPorEje,
+        porcentajeLogro: fila.porcentajeLogro,
+      });
+      expect(fila.porcentajeLogro).toBe(48.5);
+    });
+
+    it('no usa el alias en otro curso ni lo crea al descartar una fila', async () => {
+      expect((await vistaPrevia(archivoCuarto))[0].estado).toBe('noEncontrado');
+
+      await subir(
+        '/api/cargas',
+        directoraId,
+        { resoluciones: JSON.stringify({ 14: null }) },
+        archivoCuarto,
+      ).expect(201);
+
+      expect((await vistaPrevia(archivoCuarto))[0].estado).toBe('noEncontrado');
+    });
+
+    it('con el permiso, un docente solo carga y consulta sus cursos', async () => {
+      await app
+        .get(UsuariosService)
+        .actualizarPermisosRol('docente', ['cargas.evaluaciones']);
+
+      await vistaPrevia(archivo, docenteId);
+      await subir(
+        '/api/cargas/vista-previa',
+        docenteId,
+        {},
+        archivoCuarto,
+      ).expect(403);
+
+      const pedir = (ruta: string, usuarioId: string) =>
+        request(app.getHttpServer())
+          .get(ruta)
+          .set('x-usuario-prueba', usuarioId);
+      const todas = cuerpo(
+        await pedir('/api/cargas', directoraId).expect(200),
+      ) as Carga[];
+      const delDocente = cuerpo(
+        await pedir('/api/cargas', docenteId).expect(200),
+      ) as Carga[];
+      const deCuarto = todas.find(
+        (carga) => !delDocente.some((suya) => suya.id === carga.id),
+      );
+
+      expect(delDocente.length).toBeGreaterThan(0);
+      expect(new Set(delDocente.map((carga) => carga.cursoId)).size).toBe(1);
+      expect(deCuarto).toBeDefined();
+      await pedir(`/api/cargas/${deCuarto!.id}`, docenteId).expect(403);
     });
   });
 });

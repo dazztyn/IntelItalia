@@ -17,8 +17,19 @@ export class MongooseCargasRepository extends CargasRepository {
     return this.cargaModel.create(datos);
   }
 
-  listarRecientes(limite: number = 50): Promise<CargaDocument[]> {
-    return this.cargaModel.find().sort({ iniciadaEn: -1 }).limit(limite).exec();
+  listarRecientes(
+    fuentes: string[],
+    cursoIds: Types.ObjectId[] | null,
+    limite: number = 50,
+  ): Promise<CargaDocument[]> {
+    return this.cargaModel
+      .find({
+        fuente: { $in: fuentes },
+        ...(cursoIds ? { cursoId: { $in: cursoIds } } : {}),
+      })
+      .sort({ iniciadaEn: -1 })
+      .limit(limite)
+      .exec();
   }
 
   buscarPorId(id: Types.ObjectId): Promise<CargaDocument | null> {

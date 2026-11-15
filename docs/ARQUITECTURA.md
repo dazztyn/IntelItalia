@@ -476,6 +476,7 @@ Resultados **agregados de la escuela**, sin datos por alumno.
 | `cargas` | `fuente` (miAulaNotas, miAulaAsistencia, letrapps, dia, sepa, simce), `nombreArchivo`, `usuarioId`, `estado`, `filasTotales`, `filasOk`, `errores[]` (`fila`, `campo`, `mensaje`), `iniciadaEn`, `finalizadaEn` | El archivo original **no** se conserva después de procesarlo |
 | `usuarios` | `correo`, `nombre`, `rol`, `cursoIds[]`, `activo`, `ultimoAcceso` | Lista blanca: sin documento aquí no hay acceso. `cursoIds` son los cursos asignados; se usan cuando el rol tiene `alcance: "cursosAsignados"` |
 | `roles` | `codigo`, `nombre`, `jerarquia`, `alcance` (`escuela` \| `cursosAsignados`), `permisos[]` | Editables por la Directora. `alcance` limita los datos que ve el rol (ver [sección 7.4](#74-alcance-por-curso)) |
+| `aliasNombres` | `fuente`, `cursoId`, `clave`, `alumnoId`, `creadoPor` | Lo que el usuario resolvió en la vista previa de una carga (sección 6.2). Único por `{ fuente, cursoId, clave }`. `clave` es el nombre normalizado, no el texto del archivo |
 | `registroAuditoria` | `usuarioId`, `accion`, `recurso`, `recursoId`, `alumnoId`, `ip`, `fecha` | Solo se agregan registros, nunca se editan. Se conservan por un tiempo definido (⏳ a acordar) |
 
 ---
@@ -709,14 +710,14 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
   2. por **nombre normalizado**: sin tildes ni signos, en mayúsculas, con espacios simples y sin importar el orden de nombres y apellidos;
   3. el **n° de lista** solo sirve para desempatar. Nunca identifica por sí solo, porque cambia cuando entran o se retiran alumnos.
   
-  Si no hay coincidencia o hay más de un candidato, la fila aparece en la **vista previa** para que el usuario elija al alumno o la descarte. Al resolver, el usuario solo puede elegir alumnos con matrícula **activa** en el curso. ⏳ Lo que elige debe guardarse como un alias del nombre en esa fuente, para no volver a preguntarlo en las cargas siguientes (pendiente, ver sección 6.2.1). El nombre que trae el archivo se usa solo para identificar al alumno y no se guarda en el resultado.
+  Si no hay coincidencia o hay más de un candidato, la fila aparece en la **vista previa** para que el usuario elija al alumno o la descarte. Al resolver, el usuario solo puede elegir alumnos con matrícula **activa** en el curso. Lo que elige se guarda como un alias del nombre en esa fuente y ese curso (`aliasNombres`), para no volver a preguntarlo en las cargas siguientes. El nombre que trae el archivo se usa solo para identificar al alumno y no se guarda en el resultado.
 - **Valores especiales:** la marca de ausente (p. ej. "A" en SEPA, o un alumno que no aparece en el archivo) se registra como "sin resultado", nunca como 0%. En Letrapps, "No Lector" con 0 ppm **sí** es un resultado.
 - **Alcance por curso:** si quien sube el archivo tiene un rol con `alcance: "cursosAsignados"` (p. ej. `docente`), las filas de cursos que no tiene asignados se marcan como **error de fila** y no se cargan. Esto incluye la creación de alumnos desde Mi Aula.
 - **Idempotencia:** se usan upserts sobre las claves únicas (sección 3). Cargar dos veces el mismo archivo no duplica datos.
 - **Minimización:** solo se leen las columnas mapeadas y el resto se descarta. El archivo original se elimina después de procesarlo.
 - **Trazabilidad:** cada dato guarda el `cargaId` que lo originó.
 
-### 6.2.1 Implementación de la carga del DIA (PGT-54)
+### 6.2.1 Implementación de la carga de evaluaciones externas (PGT-54)
 
 Código en `backend/src/cargas/`, con una **estrategia por fuente**:
 
@@ -724,21 +725,21 @@ Código en `backend/src/cargas/`, con una **estrategia por fuente**:
 - **`estrategias/procesador-carga.base.ts`** (`ProcesadorCargaBase`) tiene el flujo común: resolver el curso, revisar el alcance, identificar a los alumnos (sección 6.2) y aplicar las resoluciones. Trae a los alumnos del curso en una sola consulta y los busca en memoria.
 - **`estrategias/dia.estrategia.ts`** (`DiaEstrategia`) aporta lo propio del DIA: leer el archivo con `parsers/dia.parser.ts` (busca las filas por su texto, "Curso", "Fecha de descarga", "Nombre del Estudiante", y no por número fijo), armar los datos de la vista previa y guardar en `resultadosEvaluacion`.
 - Cada estrategia decide dónde guarda (`guardarFilas`), así que la asistencia de Mi Aula podrá guardar en `asistencias` con el mismo flujo. La nómina no: identifica por RUT y crea alumnos.
+- **Cada estrategia declara su `permiso` y su `extension`** (el DIA: `cargas.evaluaciones` y `.xlsx`). Los endpoints de `/api/cargas` solo exigen sesión (`@SoloAutenticado`), y `CargasService` revisa el permiso y la extensión de la fuente. El historial y el detalle muestran solo las cargas de las fuentes y los cursos que el usuario puede ver.
+- **Alias de nombres** (sección 6.2): `ProcesadorCargaBase` busca primero el alias de la fuente y el curso y, si no hay, por nombre. Un alias solo vale mientras el alumno siga matriculado en el curso ese año. Al confirmar, cada fila resuelta con un alumno guarda su alias; las descartadas (`null`) no.
 
 **Desviaciones del flujo de la sección 6.1, aceptadas para la presentación:**
 
 - **Se procesa dentro de la petición, sin BullMQ**: un DIA trae unas 25 filas. Cuando lleguen archivos grandes (Mi Aula de toda la escuela), el mismo servicio pasa a la cola `procesarCarga`.
 - **El archivo se procesa en memoria** y nunca se escribe en disco, así que no hay archivo temporal que borrar. La vista previa y la confirmación reciben el mismo archivo: el servidor no guarda nada entre una y otra.
-- ⏳ **Todavía no se guardan los alias de nombres** que el usuario elige en la vista previa (sección 6.2): en cada carga se vuelven a resolver.
-- El permiso es `cargas.evaluaciones` para todo, porque la única fuente es el DIA.
 
 **Contrato para el frontend** (todo con la cookie de sesión). Los `POST` son `multipart/form-data`:
 
 | Endpoint | Recibe | Responde |
 |----------|--------|----------|
-| `POST /api/cargas/vista-previa` | `archivo` (.xlsx, máx. 5 MB), `fuente=dia`, `momento` (`diagnostico` \| `monitoreo` \| `cierre`) | 200 con la vista previa (abajo). **No guarda nada** |
+| `POST /api/cargas/vista-previa` | `archivo` (con la extensión de la fuente, máx. 5 MB), `fuente` (hoy solo `dia`), `momento` (uno de los momentos del instrumento; DIA: `diagnostico` \| `monitoreo` \| `cierre`) | 200 con la vista previa (abajo). **No guarda nada** |
 | `POST /api/cargas` | lo mismo + `resoluciones` (opcional, JSON como texto) | 201 con la carga: `{ id, fuente, nombreArchivo, cursoId, anio, momento, area, estado, filasTotales, filasOk, errores: [{ fila, campo, mensaje }], iniciadaEn, finalizadaEn }` |
-| `GET /api/cargas` | — | Las últimas 50 cargas, como arriba pero sin `errores` |
+| `GET /api/cargas` | — | Las últimas 50 cargas de las fuentes y cursos del usuario, como arriba pero sin `errores` |
 | `GET /api/cargas/:id` | — | Una carga con sus `errores` |
 
 Vista previa:
@@ -753,14 +754,16 @@ Vista previa:
     "estado": "encontrado",
     "alumnoId": "…",
     "candidatos": [{ "id": "…", "nombreCompleto": "Ana María Pérez Soto" }],
+    "resultados": { "porcentajesPorEje": { "localizar": 55.5, "interpretarRelacionar": 70, "reflexionar": 20 }, "porcentajeLogro": 48.5 },
     "porcentajesPorEje": { "localizar": 55.5, "interpretarRelacionar": 70, "reflexionar": 20 },
     "porcentajeLogro": 48.5
   }]
 }
 ```
 
+- **`resultados`** es lo que se va a guardar, y su forma depende de la fuente (sección 3.6). `porcentajesPorEje` y `porcentajeLogro` son los mismos datos para el DIA y quedan **obsoletos**: el frontend debe pasar a leer `resultados`. En otras fuentes vendrán en `null`.
 - **`estado` de cada fila:**
-  - `encontrado`: un solo alumno coincide;
+  - `encontrado`: un solo alumno coincide, o se identificó por un alias (`porAlias: true`);
   - `ambiguo`: varios coinciden, y están en `candidatos`;
   - `noEncontrado`: nadie coincide. El frontend ofrece los alumnos del curso con `GET /api/cursos/:id/alumnos`;
   - `sinResultado`: el alumno no rindió. No se guarda nada, nunca 0%;
@@ -768,8 +771,8 @@ Vista previa:
 - **`resoluciones`:** `{ "<fila>": "<alumnoId>" | null }`, solo para las filas dudosas. `null` descarta la fila. El alumno elegido tiene que estar matriculado en el curso. Una fila `ambiguo` o `noEncontrado` sin resolver queda como error de la carga.
 - **`estado` de la carga:** `completada` (sin errores), `completadaConErrores` o `fallida` (no se guardó ninguna fila).
 - **Errores de la petición:**
-  - 400: falta el archivo, no es `.xlsx`, `fuente` o `momento` no son válidos, el archivo no tiene el formato del DIA, el curso no existe ese año o las `resoluciones` están mal formadas;
-  - 403: falta el permiso o el curso está fuera del alcance;
+  - 400: falta el archivo, no tiene la extensión de la fuente, `fuente` o `momento` no son válidos, el archivo no tiene el formato de la fuente, el curso no existe ese año o las `resoluciones` están mal formadas;
+  - 403: falta el permiso de la fuente, o la carga o el curso están fuera del alcance;
   - 413: el archivo supera 5 MB.
 - **Auditoría:** cada carga confirmada registra `carga.crear`.
 
@@ -856,6 +859,7 @@ Los permisos se guardan en la colección `roles` y la **Directora puede editarlo
 - **Sesión:** el guard lee `request.sesion = { usuarioId }`. Si no viene, la obtiene de la cookie de sesión (JWT) con `SesionCookieService` (PGT-6). En cada request carga de la base el usuario y su rol, así que desactivar a alguien o cambiar sus permisos tiene efecto inmediato.
 - **Respuestas:** sin sesión, o con un usuario inexistente o inactivo, responde **401**. Si falta un permiso, responde **403**.
 - **Se deniega por defecto:** una ruta sin `@RequierePermisos` responde 403. Las rutas sin sesión (salud y el login) se marcan con `@Publica()`, y las que solo exigen haber iniciado sesión (perfil, salir) con `@SoloAutenticado()`.
+- **Excepción:** en `/api/cargas` el permiso depende de la fuente del archivo, así que los endpoints solo exigen sesión y `CargasService` revisa el permiso que declara cada estrategia (sección 6.2.1).
 - **Roles iniciales:** se crean al iniciar la API si no existen, también en producción. Los ya existentes no se modifican, para no pisar lo que edite la Directora.
 - `usuarios.rol` guarda el **código** del rol (p. ej. `"docente"`).
 - Por ahora existen los roles `directora` y `docente`, con los permisos de la tabla. ⏳ Faltan los demás roles.

@@ -67,7 +67,7 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 - Los permisos se guardan en la base de datos (colección `roles`) y la Directora los edita. No se codifican por rol en el código.
 - **Alcance por curso:** `roles.alcance` es `escuela` o `cursosAsignados`. Con `cursosAsignados` (hoy, `docente`) el usuario solo ve y carga datos de los cursos en `usuarios.cursoIds`. Esto se filtra en los servicios, no solo en el guard. Ver sección 7.4 del documento.
 - El `docente` sube notas y asistencia, ve la ficha y las alertas, y registra observaciones (no psicosociales ni PIE), siempre solo de sus cursos.
-- Cada endpoint exige su permiso con `@RequierePermisos('…')`.
+- Cada endpoint exige su permiso con `@RequierePermisos('…')`. Excepción: en `/api/cargas` el permiso depende de la fuente y lo revisa `CargasService` (cada estrategia lo declara).
 
 **Implementación (backend):**
 
@@ -127,7 +127,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43); creación de cursos por año (`POST /api/cursos` y `/api/cursos/preparar-anio`) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
-| Cargas | Carga del DIA con vista previa y confirmación (`/api/cargas`, PGT-54), con una estrategia por fuente (`cargas/estrategias/`); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | Rehacer sobre las estrategias lo de la rama `cargas-varias-fuentes` (pendiente 7); lectores de Letrapps y SEPA; Mi Aula; BullMQ |
+| Cargas | Carga de evaluaciones externas con una estrategia por fuente (`cargas/estrategias/`), hoy el DIA: vista previa, confirmación, permiso y extensión por fuente, historial filtrado por fuente y curso, y alias de nombres (`/api/cargas`, PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion`, `cargas` y `aliasNombres` | Lectores de Letrapps y SEPA; Mi Aula (pendiente 7); BullMQ |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Login con Google y sesión real; layout con `Topbar` y `Sidebar` (menú según permisos) y TanStack Query. Rutas: `/` vista general (tabla de alumnos por curso con la API y dashboard con datos de ejemplo de `datos/ejemplo.ts`), `/alumnos/:id` ficha con los resultados del DIA y `/cargas` carga del DIA (permiso `cargas.evaluaciones`) | Dashboard con datos reales, administración y alertas |
 
@@ -141,24 +141,18 @@ Ajustes ya conversados con el equipo que todavía no están en el código. Al im
 4. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
 5. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
 6. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
-7. **Rehacer sobre las estrategias lo de la rama `cargas-varias-fuentes`** (respaldo en `origin/cargas-varias-fuentes`, commit `41ab699`, que no se mergea). Esa rama generalizó la carga con otro diseño, que se reemplazó por el de estrategias. Hay que pasar a la estructura nueva:
-   - **Permiso por fuente:** `readonly permiso` en `EstrategiaCarga`; `CargasService` lo revisa (403) y el controlador pasa a `@SoloAutenticado()`. Documentar la excepción a "cada endpoint con `@RequierePermisos`".
-   - **Extensión por fuente:** `readonly extension` en la estrategia, validada en `CargasService`.
-   - **Historial filtrado:** `CargasRepository.listarRecientes` recibe las fuentes permitidas y los cursos del alcance; `obtener` responde 403 fuera de ellos.
-   - **`resultados` genérico en la vista previa:** `armarDatosVistaPrevia` devuelve `resultados` (lo que se guarda) además de `porAlias?`; `porcentajesPorEje` y `porcentajeLogro` quedan como obsoletos mientras el frontend se adapta.
-   - **Alias de nombres** (sección 6.2): esquema `cargas/schemas/alias-nombre.schema.ts` (único `{ fuente, cursoId, clave }`) y su repositorio; `ProcesadorCargaBase` los busca antes que el nombre y guarda uno por cada fila resuelta con un alumno.
-   - **Tests:** los 4 e2e nuevos de esa rama en `test/cargas.e2e-spec.ts` (alias, `resultados`, docente con y sin permiso, historial por curso).
-   - **Documentación:** secciones 3.10, 6.2.1 y 7.3 de `ARQUITECTURA.md`, como en esa rama.
-8. **Mi Aula en PDF:** la escuela entregó la nómina de un curso y la asistencia en PDF. Antes de implementar: confirmar que el PDF trae texto (no una imagen escaneada), preguntar si Mi Aula exporta a Excel o CSV (preferible) y conseguir una muestra **anonimizada** para ver las columnas (¿la nómina trae RUT?, ¿la asistencia es diaria, mensual o semestral?). Primero la nómina (crea a los alumnos reales y destraba la identificación de las demás cargas) y después la asistencia (`asistencias`, sección 3.5) con sus alertas. Falta elegir la librería para leer PDF, que también servirá para Letrapps.
-9. **Dashboard** (`/?vista=dashboard`): sigue con datos de ejemplo de `frontend/src/datos/ejemplo.ts`. Pasarlo a datos reales cuando existan las alertas.
-10. **Ficha:** falta la sección "Notas y asistencia: pendiente de Mi Aula".
+7. **Mi Aula en PDF:** la escuela entregó la nómina de un curso y la asistencia en PDF. Antes de implementar: confirmar que el PDF trae texto (no una imagen escaneada), preguntar si Mi Aula exporta a Excel o CSV (preferible) y conseguir una muestra **anonimizada** para ver las columnas (¿la nómina trae RUT?, ¿la asistencia es diaria, mensual o semestral?). Primero la nómina (crea a los alumnos reales y destraba la identificación de las demás cargas) y después la asistencia (`asistencias`, sección 3.5) con sus alertas. Falta elegir la librería para leer PDF, que también servirá para Letrapps.
+8. **Dashboard** (`/?vista=dashboard`): sigue con datos de ejemplo de `frontend/src/datos/ejemplo.ts`. Pasarlo a datos reales cuando existan las alertas.
+9. **Ficha:** falta la sección "Notas y asistencia: pendiente de Mi Aula".
+10. **Frontend de cargas:** pasar a leer `resultados` en la vista previa (`porcentajesPorEje` y `porcentajeLogro` quedaron obsoletos) y, opcionalmente, avisar cuando una fila se identificó por alias (`porAlias`).
+11. **Sugerir el alumno más parecido** (idea, después del MVP): hoy una fila `noEncontrado` llega sin `candidatos` y el frontend lista a todos los alumnos libres del curso, sin orden. Idea: que `ProcesadorCargaBase.identificar` llene `candidatos` con los alumnos del curso ordenados por parecido (p. ej. cuántas palabras de `claveNombre` comparten), para cubrir sobrenombres ("Josefita" / "Josefa"), errores de tipeo y un segundo nombre que falta en el archivo. Solo sugiere: el usuario sigue eligiendo, y el alias recuerda lo elegido.
 
 ### Cómo agregar una prueba nueva (evaluación externa)
 
 1. Conseguir el formato real **anonimizado** y describirlo en la sección 4.4 de `ARQUITECTURA.md`. No se implementa con supuestos.
 2. Agregar el instrumento en `backend/src/evaluaciones/tipos-iniciales.ts` (código, áreas, niveles, momentos y campos). Se crea solo al iniciar la API.
 3. Escribir el lector en `backend/src/cargas/parsers/`, con su test unitario usando un archivo **ficticio** armado en el test.
-4. Crear `XEstrategia extends ProcesadorCargaBase` en `backend/src/cargas/estrategias/`, con `parsear` (usa el lector y valida el momento), `armarDatosVistaPrevia` y `guardarFilas`.
+4. Crear `XEstrategia extends ProcesadorCargaBase` en `backend/src/cargas/estrategias/`. Declara `fuente`, `permiso` (p. ej. `cargas.evaluaciones`) y `extension` (p. ej. `.xlsx`), e implementa `parsear` (usa el lector y valida el momento), `armarDatosVistaPrevia` (devuelve `resultados`, lo que se guarda) y `guardarFilas`. Los alias, el permiso y la auditoría los resuelven la base y `CargasService`.
 5. Agregar la fuente a `FUENTES_CARGA` (`cargas/schemas/carga.schema.ts`), registrar la estrategia como provider en `cargas.module.ts` y sumarla al mapa del constructor de `CargasService`.
 6. En el frontend, cambiar `fuente: null` por la fuente en `frontend/src/datos/tiposCarga.ts`.
 

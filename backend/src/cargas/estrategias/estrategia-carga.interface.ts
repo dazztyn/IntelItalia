@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import type { UsuarioAutorizado } from '../../comun/autorizacion';
 import { Nivel } from '../../cursos/niveles';
+import type { Permiso } from '../../usuarios/permisos';
 import { CargaDto } from '../dto/carga.dto';
 import { ErrorFila, FuenteCarga } from '../schemas/carga.schema';
 import { ArchivoSubido } from '../interfaces/archivo-subido.interface';
@@ -42,6 +43,10 @@ export interface ResultadoProcesamientoCarga {
 
 export interface EstrategiaCarga {
   readonly fuente: FuenteCarga;
+  /** Permiso que necesita quien carga esta fuente (lo revisa CargasService). */
+  readonly permiso: Permiso;
+  /** Extensión del archivo que acepta la fuente, p. ej. '.xlsx'. */
+  readonly extension: string;
 
   previsualizar(
     archivo: ArchivoSubido,

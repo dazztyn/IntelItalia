@@ -8,6 +8,7 @@ import { CursoDocument } from '../../cursos/curso.schema';
 import { CursosService } from '../../cursos/cursos.service';
 import { nombreCurso } from '../../cursos/niveles';
 import { tieneAccesoACurso } from '../../usuarios/alcance';
+import type { Permiso } from '../../usuarios/permisos';
 import { CargaDto } from '../dto/carga.dto';
 import { ArchivoSubido } from '../interfaces/archivo-subido.interface';
 import {
@@ -18,9 +19,11 @@ import {
   ResultadoProcesamientoCarga,
 } from './estrategia-carga.interface';
 import {
+  DatosFilaVistaPrevia,
   FilaVistaPrevia,
   VistaPrevia,
 } from '../interfaces/vista-previa.interface';
+import { AliasNombresRepository } from '../repositorios/alias-nombres.repository';
 import { ErrorFila, FuenteCarga } from '../schemas/carga.schema';
 
 export abstract class ProcesadorCargaBase<
@@ -28,10 +31,13 @@ export abstract class ProcesadorCargaBase<
   TMeta,
 > implements EstrategiaCarga {
   abstract readonly fuente: FuenteCarga;
+  abstract readonly permiso: Permiso;
+  abstract readonly extension: string;
 
   constructor(
     protected readonly cursosService: CursosService,
     protected readonly alumnosService: AlumnosService,
+    protected readonly aliasRepo: AliasNombresRepository,
   ) {}
 
   protected abstract parsear(
@@ -39,9 +45,8 @@ export abstract class ProcesadorCargaBase<
     dto: CargaDto,
   ): Promise<DatosParseados<TDatos, TMeta>>;
 
-  protected abstract armarDatosVistaPrevia(
-    datos: TDatos,
-  ): Pick<FilaVistaPrevia, 'porcentajesPorEje' | 'porcentajeLogro'>;
+  /** `resultados` es lo que se guarda; los otros dos campos solo los llena el DIA. */
+  protected abstract armarDatosVistaPrevia(datos: TDatos): DatosFilaVistaPrevia;
 
   protected abstract guardarFilas(
     filasAprobadas: FilaAprobada<TDatos>[],
@@ -146,6 +151,22 @@ export abstract class ProcesadorCargaBase<
       );
     }
 
+    // Recuerda lo que el usuario eligió, para no preguntarlo en la próxima carga.
+    // Las filas descartadas (`null`) no crean alias.
+    for (const fila of vistaPrevia.filas) {
+      const elegido = resoluciones[String(fila.fila)];
+      if (!elegido || elegido === fila.alumnoId || !guardados.has(elegido)) {
+        continue;
+      }
+      await this.aliasRepo.guardar({
+        fuente: this.fuente,
+        cursoId: curso._id,
+        clave: claveNombre(fila.nombre),
+        alumnoId: new Types.ObjectId(elegido),
+        creadoPor: usuario.id,
+      });
+    }
+
     return {
       cursoId: curso._id,
       anio: vistaPrevia.anio,
@@ -198,8 +219,14 @@ export abstract class ProcesadorCargaBase<
       mapaPorNombre.set(alumno.nombreNormalizado, lista);
     }
 
+    const porId = new Map(alumnosCurso.map((a) => [String(a._id), a]));
+    const alias = await this.aliasRepo.listarPorFuenteYCurso(
+      this.fuente,
+      curso._id,
+    );
+
     const filas = parseado.filas.map((fila) =>
-      this.identificar(fila, mapaPorNombre),
+      this.identificar(fila, mapaPorNombre, porId, alias),
     );
 
     const vistaPrevia: VistaPrevia = {
@@ -219,9 +246,15 @@ export abstract class ProcesadorCargaBase<
     };
   }
 
+  /**
+   * Identifica al alumno de una fila (sección 6.2): primero por lo que alguien
+   * resolvió en una carga anterior (alias) y, si no, por nombre.
+   */
   private identificar(
     fila: FilaExtraida<TDatos>,
     mapaPorNombre: Map<string, AlumnoDocument[]>,
+    porId: Map<string, AlumnoDocument>,
+    alias: Map<string, string>,
   ): FilaVistaPrevia {
     const base = {
       fila: fila.fila,
@@ -235,17 +268,21 @@ export abstract class ProcesadorCargaBase<
     if (fila.error) return { ...base, estado: 'error', mensaje: fila.error };
     if (fila.sinResultado) return { ...base, estado: 'sinResultado' };
 
-    const encontrados = mapaPorNombre.get(claveNombre(fila.nombre)) ?? [];
-    const candidatos = encontrados.map((alumno) => ({
-      id: String(alumno._id),
-      nombreCompleto: [
-        alumno.nombres,
-        alumno.apellidoPaterno,
-        alumno.apellidoMaterno,
-      ]
-        .filter(Boolean)
-        .join(' '),
-    }));
+    const clave = claveNombre(fila.nombre);
+    // El alias solo vale mientras el alumno siga matriculado en el curso ese año.
+    const recordado = porId.get(alias.get(clave) ?? '');
+    if (recordado) {
+      const candidato = comoCandidato(recordado);
+      return {
+        ...base,
+        estado: 'encontrado',
+        alumnoId: candidato.id,
+        candidatos: [candidato],
+        porAlias: true,
+      };
+    }
+
+    const candidatos = (mapaPorNombre.get(clave) ?? []).map(comoCandidato);
 
     if (candidatos.length === 1) {
       return {
@@ -262,4 +299,17 @@ export abstract class ProcesadorCargaBase<
       candidatos,
     };
   }
+}
+
+function comoCandidato(alumno: AlumnoDocument) {
+  return {
+    id: String(alumno._id),
+    nombreCompleto: [
+      alumno.nombres,
+      alumno.apellidoPaterno,
+      alumno.apellidoMaterno,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  };
 }
