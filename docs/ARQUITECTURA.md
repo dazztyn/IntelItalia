@@ -124,6 +124,8 @@ La **prioridad** son las áreas de **Lenguaje y Matemática**.
 | `observaciones` | Anotaciones del personal sobre cada alumno |
 | `auditoria` | Registro de accesos y acciones sobre datos personales |
 
+**Capas de cada módulo:** controlador (HTTP, permisos) → servicio (reglas de negocio) → **repositorio** (consultas a MongoDB). Cada repositorio es una clase abstracta (`repositorios/x.repository.ts`) con su implementación en Mongoose (`repositorios/mongoose-x.repository.ts`), y el módulo los conecta con `{ provide: XRepository, useClass: MongooseXRepository }`. Los servicios no usan `@InjectModel`. Los tipos compartidos van en `interfaces/`.
+
 ### Despliegue
 
 - **Docker Compose** con cuatro servicios: `api` (NestJS, incluye los workers), `web` (frontend compilado servido por Nginx), `mongo` y `redis`.
@@ -702,12 +704,12 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
 - **Vista previa:** antes de confirmar, el usuario puede validar el archivo y ver cuántas filas se cargarían y qué errores hay, sin guardar nada.
 - **Validación del RUT:** se normaliza (quita puntos, espacios y pasa el DV a mayúscula) y se valida el dígito verificador. Un RUT inválido es error de fila, no de todo el archivo.
 - **Alumnos:** un alumno que no existe se crea desde la carga de Mi Aula, que es la fuente oficial de matrícula y la única que se espera que traiga el RUT (⏳ formato pendiente). Las cargas de evaluaciones externas **no** crean alumnos.
-- **Identificación en evaluaciones externas** (Letrapps, DIA, SEPA), que no traen RUT (sección 4.4). El alumno se busca entre los **matriculados en el curso** del archivo, en este orden:
+- **Identificación en evaluaciones externas** (Letrapps, DIA, SEPA), que no traen RUT (sección 4.4). El alumno se busca entre **todos los matriculados en el curso** ese año, incluidos los retirados y trasladados (rindieron mientras estaban en el curso), en este orden:
   1. por RUT, si el archivo lo trae;
   2. por **nombre normalizado**: sin tildes ni signos, en mayúsculas, con espacios simples y sin importar el orden de nombres y apellidos;
   3. el **n° de lista** solo sirve para desempatar. Nunca identifica por sí solo, porque cambia cuando entran o se retiran alumnos.
   
-  Si no hay coincidencia o hay más de un candidato, la fila aparece en la **vista previa** para que el usuario elija al alumno o la descarte. Lo que el usuario elige se guarda como un alias del nombre en esa fuente, para no volver a preguntarlo en las cargas siguientes. El nombre que trae el archivo se usa solo para identificar al alumno y no se guarda en el resultado.
+  Si no hay coincidencia o hay más de un candidato, la fila aparece en la **vista previa** para que el usuario elija al alumno o la descarte. Al resolver, el usuario solo puede elegir alumnos con matrícula **activa** en el curso. ⏳ Lo que elige debe guardarse como un alias del nombre en esa fuente, para no volver a preguntarlo en las cargas siguientes (pendiente, ver sección 6.2.1). El nombre que trae el archivo se usa solo para identificar al alumno y no se guarda en el resultado.
 - **Valores especiales:** la marca de ausente (p. ej. "A" en SEPA, o un alumno que no aparece en el archivo) se registra como "sin resultado", nunca como 0%. En Letrapps, "No Lector" con 0 ppm **sí** es un resultado.
 - **Alcance por curso:** si quien sube el archivo tiene un rol con `alcance: "cursosAsignados"` (p. ej. `docente`), las filas de cursos que no tiene asignados se marcan como **error de fila** y no se cargan. Esto incluye la creación de alumnos desde Mi Aula.
 - **Idempotencia:** se usan upserts sobre las claves únicas (sección 3). Cargar dos veces el mismo archivo no duplica datos.
@@ -716,7 +718,12 @@ Una alerta que deja de cumplirse se **cierra automáticamente** y queda en el hi
 
 ### 6.2.1 Implementación de la carga del DIA (PGT-54)
 
-Código en `backend/src/cargas/`. El lector del archivo es `parsers/dia.parser.ts`: busca las filas por su texto ("Curso", "Fecha de descarga", "Nombre del Estudiante") y no por número fijo.
+Código en `backend/src/cargas/`, con una **estrategia por fuente**:
+
+- **`CargasService`** elige la estrategia según `fuente`, registra la carga en `cargas` y la audita.
+- **`estrategias/procesador-carga.base.ts`** (`ProcesadorCargaBase`) tiene el flujo común: resolver el curso, revisar el alcance, identificar a los alumnos (sección 6.2) y aplicar las resoluciones. Trae a los alumnos del curso en una sola consulta y los busca en memoria.
+- **`estrategias/dia.estrategia.ts`** (`DiaEstrategia`) aporta lo propio del DIA: leer el archivo con `parsers/dia.parser.ts` (busca las filas por su texto, "Curso", "Fecha de descarga", "Nombre del Estudiante", y no por número fijo), armar los datos de la vista previa y guardar en `resultadosEvaluacion`.
+- Cada estrategia decide dónde guarda (`guardarFilas`), así que la asistencia de Mi Aula podrá guardar en `asistencias` con el mismo flujo. La nómina no: identifica por RUT y crea alumnos.
 
 **Desviaciones del flujo de la sección 6.1, aceptadas para la presentación:**
 

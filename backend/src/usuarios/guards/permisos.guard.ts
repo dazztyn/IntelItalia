@@ -13,12 +13,11 @@ import {
   CLAVE_PERMISOS,
   CLAVE_PUBLICA,
   CLAVE_SOLO_AUTENTICADO,
+  EXTRACTOR_SESION_HTTP,
   SolicitudAutorizada,
 } from '../../comun/autorizacion';
 import type { Permiso } from '../permisos';
 import { UsuariosService } from '../usuarios.service';
-
-export const EXTRACTOR_SESION_HTTP = 'EXTRACTOR_SESION_HTTP';
 
 export interface ExtractorSesionHttp {
   extraerUsuarioIdDePeticion(peticion: Request): Promise<string | null>;

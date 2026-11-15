@@ -4,14 +4,9 @@ import { AsignaturasService } from '../asignaturas/asignaturas.service';
 import { CursosService } from '../cursos/cursos.service';
 import { NIVELES } from '../cursos/niveles';
 import { generarAlumnosFicticios } from './datos-ficticios';
+import { ResumenSemilla } from './interfaces/resumen-semilla.interface';
 
 export const ALUMNOS_POR_CURSO = 20;
-
-export interface ResumenSemilla {
-  asignaturasCreadas: number;
-  cursosCreados: number;
-  alumnosCreados: number;
-}
 
 @Injectable()
 export class SemillaService {

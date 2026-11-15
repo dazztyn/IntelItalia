@@ -94,6 +94,13 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 - Se registra emitiendo el evento `auditoria.acceso` con `EventEmitter2`; `AuditoriaListener` lo guarda en `registroAuditoria`. Solo identificadores (`usuarioId`, `alumnoId`, `recursoId`), nunca RUT, nombres ni notas.
 - Hoy se registran el inicio de sesión, el cierre, el acceso denegado al login, cada carga (`carga.crear`), cada ficha vista (`ficha.ver`) y cada ficha fuera del alcance (`accesoDenegado`). ⏳ Faltan las exportaciones, los cambios de usuarios y permisos, y los 403 del guard.
 
+### Estructura del backend
+
+- **Capas:** controlador (HTTP y permisos) → servicio (reglas de negocio) → **repositorio** (consultas a MongoDB). Cada módulo tiene `repositorios/` con una clase abstracta (`XRepository`) y su implementación (`MongooseXRepository`), conectadas en el módulo con `{ provide: XRepository, useClass: MongooseXRepository }`. **Los servicios no usan `@InjectModel`**: una consulta nueva va en el repositorio. Los tipos compartidos van en `interfaces/`. (En auditoría, la clase abstracta está en `auditoria/auditoria.repository.ts` y no en `repositorios/`.)
+- **`bulkWrite` y `updateOne` no ejecutan los `pre('validate')` del esquema.** Los campos calculados (`nombresNormalizados` de asignaturas, `nombreNormalizado` de alumnos, `nombre` de cursos) hay que calcularlos a mano en esas operaciones, o usar `create`. Por olvidar esto, el catálogo de asignaturas quedó un tiempo sin `nombresNormalizados`.
+- **Alumnos de un curso:** `listarPorCurso` trae solo matrículas activas (listados, validar lo que el usuario elige) y `listarTodosPorCurso` trae todas (identificar alumnos en una carga, incluidos retirados y trasladados).
+- **Cargas:** `CargasService` elige una estrategia por `fuente`. `ProcesadorCargaBase` (`cargas/estrategias/`) tiene el flujo común y cada estrategia (hoy `DiaEstrategia`) aporta su lector, los datos de la vista previa y dónde guarda. Ver "Cómo agregar una prueba nueva".
+
 ### Implementación (frontend)
 
 - **`src/api/`:** una función por endpoint, siempre con `pedir()` (`api/cliente.ts`), que agrega el prefijo `/api`, envía la cookie de sesión y convierte los errores en `ErrorApi` con el mensaje del backend.
@@ -120,7 +127,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43); creación de cursos por año (`POST /api/cursos` y `/api/cursos/preparar-anio`) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
-| Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
+| Cargas | Carga del DIA con vista previa y confirmación (`/api/cargas`, PGT-54), con una estrategia por fuente (`cargas/estrategias/`); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | Rehacer sobre las estrategias lo de la rama `cargas-varias-fuentes` (pendiente 7); lectores de Letrapps y SEPA; Mi Aula; BullMQ |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Login con Google y sesión real; layout con `Topbar` y `Sidebar` (menú según permisos) y TanStack Query. Rutas: `/` vista general (tabla de alumnos por curso con la API y dashboard con datos de ejemplo de `datos/ejemplo.ts`), `/alumnos/:id` ficha con los resultados del DIA y `/cargas` carga del DIA (permiso `cargas.evaluaciones`) | Dashboard con datos reales, administración y alertas |
 
@@ -134,32 +141,26 @@ Ajustes ya conversados con el equipo que todavía no están en el código. Al im
 4. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
 5. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
 6. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
+7. **Rehacer sobre las estrategias lo de la rama `cargas-varias-fuentes`** (respaldo en `origin/cargas-varias-fuentes`, commit `41ab699`, que no se mergea). Esa rama generalizó la carga con otro diseño, que se reemplazó por el de estrategias. Hay que pasar a la estructura nueva:
+   - **Permiso por fuente:** `readonly permiso` en `EstrategiaCarga`; `CargasService` lo revisa (403) y el controlador pasa a `@SoloAutenticado()`. Documentar la excepción a "cada endpoint con `@RequierePermisos`".
+   - **Extensión por fuente:** `readonly extension` en la estrategia, validada en `CargasService`.
+   - **Historial filtrado:** `CargasRepository.listarRecientes` recibe las fuentes permitidas y los cursos del alcance; `obtener` responde 403 fuera de ellos.
+   - **`resultados` genérico en la vista previa:** `armarDatosVistaPrevia` devuelve `resultados` (lo que se guarda) además de `porAlias?`; `porcentajesPorEje` y `porcentajeLogro` quedan como obsoletos mientras el frontend se adapta.
+   - **Alias de nombres** (sección 6.2): esquema `cargas/schemas/alias-nombre.schema.ts` (único `{ fuente, cursoId, clave }`) y su repositorio; `ProcesadorCargaBase` los busca antes que el nombre y guarda uno por cada fila resuelta con un alumno.
+   - **Tests:** los 4 e2e nuevos de esa rama en `test/cargas.e2e-spec.ts` (alias, `resultados`, docente con y sin permiso, historial por curso).
+   - **Documentación:** secciones 3.10, 6.2.1 y 7.3 de `ARQUITECTURA.md`, como en esa rama.
+8. **Mi Aula en PDF:** la escuela entregó la nómina de un curso y la asistencia en PDF. Antes de implementar: confirmar que el PDF trae texto (no una imagen escaneada), preguntar si Mi Aula exporta a Excel o CSV (preferible) y conseguir una muestra **anonimizada** para ver las columnas (¿la nómina trae RUT?, ¿la asistencia es diaria, mensual o semestral?). Primero la nómina (crea a los alumnos reales y destraba la identificación de las demás cargas) y después la asistencia (`asistencias`, sección 3.5) con sus alertas. Falta elegir la librería para leer PDF, que también servirá para Letrapps.
+9. **Dashboard** (`/?vista=dashboard`): sigue con datos de ejemplo de `frontend/src/datos/ejemplo.ts`. Pasarlo a datos reales cuando existan las alertas.
+10. **Ficha:** falta la sección "Notas y asistencia: pendiente de Mi Aula".
 
-### Tareas para la presentación (noviembre 2026)
+### Cómo agregar una prueba nueva (evaluación externa)
 
-Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA ficticio → resolver las filas dudosas → ver la ficha del alumno con su resultado. Todo con datos ficticios.
-
-**Hecho (PR #20 a #23):** el recorrido completo funciona en el frontend y se probó de punta a punta con el DIA ficticio.
-
-| # | Tarea | Dónde quedó |
-|---|-------|-------------|
-| 1 | Script `npm run dia-ficticio` | PR #20 |
-| 2 | Pantalla principal con datos de la API | PR #22: la tabla de alumnos usa la API; el dashboard sigue con datos de ejemplo (ver pendientes) |
-| 3 | Vista de curso | PR #22: quedó dentro de `/`, con un selector de curso (`?curso=`), no en `/cursos/:id` |
-| 4 | Ficha `/alumnos/:id` | PR #22 y #23: datos, matrícula y resultados del DIA con los % por eje. ⏳ Falta la sección "Notas y asistencia: pendiente de Mi Aula" |
-| 5 | Carga `/cargas` | PR #22 y #23: un archivo por curso, vista previa, resolución de filas dudosas, cargas parciales y tarjetas que muestran lo ya cargado. No hay una lista aparte con el historial |
-
-**Pendiente:**
-
-| # | Tarea | Quién | Depende de |
-|---|-------|-------|------------|
-| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la tabla de alumnos | Backend | Opcional para la demo |
-| 7 | Referencia de la API (pendiente 3), para que el frontend tenga un solo lugar donde mirar | Backend | — |
-| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | — |
-| 9 | Dashboard (`/?vista=dashboard`): hoy muestra datos de ejemplo de `frontend/src/datos/ejemplo.ts`, con la etiqueta "Datos de ejemplo". En la demo, presentarlo como diseño, o pasarlo a datos reales cuando existan las alertas | Frontend | Alertas (sección 5) |
-
-**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 2, 4 y 6.
-
+1. Conseguir el formato real **anonimizado** y describirlo en la sección 4.4 de `ARQUITECTURA.md`. No se implementa con supuestos.
+2. Agregar el instrumento en `backend/src/evaluaciones/tipos-iniciales.ts` (código, áreas, niveles, momentos y campos). Se crea solo al iniciar la API.
+3. Escribir el lector en `backend/src/cargas/parsers/`, con su test unitario usando un archivo **ficticio** armado en el test.
+4. Crear `XEstrategia extends ProcesadorCargaBase` en `backend/src/cargas/estrategias/`, con `parsear` (usa el lector y valida el momento), `armarDatosVistaPrevia` y `guardarFilas`.
+5. Agregar la fuente a `FUENTES_CARGA` (`cargas/schemas/carga.schema.ts`), registrar la estrategia como provider en `cargas.module.ts` y sumarla al mapa del constructor de `CargasService`.
+6. En el frontend, cambiar `fuente: null` por la fuente en `frontend/src/datos/tiposCarga.ts`.
 
 ## Comandos
 

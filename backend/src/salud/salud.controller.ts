@@ -1,7 +1,8 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Publica } from '../comun/autorizacion';
-import { EstadoSalud, SaludService } from './salud.service';
+import { SaludService } from './salud.service';
+import { EstadoSalud } from './interfaces/estado-salud.interface';
 
 @Publica()
 @Controller('salud')

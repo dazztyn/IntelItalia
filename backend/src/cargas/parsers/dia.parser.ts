@@ -1,32 +1,12 @@
 import { Row, Workbook, Worksheet } from 'exceljs';
 import { normalizarTexto } from '../../comun/texto';
 import { NIVELES, type Nivel } from '../../cursos/niveles';
+import { ArchivoDia, FilaDia } from '../interfaces/archivo-dia.interface';
 
 // Lector del reporte del DIA (.xlsx, un archivo por curso y área). Formato en
 // docs/ARQUITECTURA.md, sección 4.4. Solo lee las columnas que se usan.
 
 export class FormatoInvalidoError extends Error {}
-
-export interface FilaDia {
-  /** N° de fila en Excel, para el informe de errores. */
-  fila: number;
-  numeroLista: number | null;
-  /** Solo para identificar al alumno: nunca se guarda. */
-  nombre: string;
-  /** `null` si el alumno no tiene resultados (no rindió). */
-  porcentajesPorEje: Record<string, number> | null;
-  porcentajeLogro: number | null;
-  error?: string;
-}
-
-export interface ArchivoDia {
-  nivel: Nivel;
-  letra: string | null;
-  anio: number;
-  area: 'lenguaje' | 'matematica';
-  ejes: string[];
-  filas: FilaDia[];
-}
 
 const EJES_LECTURA: Record<string, string> = {
   LOCALIZAR: 'localizar',
