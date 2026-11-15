@@ -1,12 +1,12 @@
 import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { FUENTES_CARGA, type FuenteCarga } from '../schemas/carga.schema';
+import { FUENTES_CARGA, type FuenteCarga } from '../fuentes';
 
 // Campos de texto del formulario multipart; el archivo llega aparte (`archivo`).
 export class CargaDto {
   @IsIn(FUENTES_CARGA, { message: 'fuente no soportada todavía' })
   fuente!: FuenteCarga;
 
-  /** DIA: diagnostico | monitoreo | cierre (el archivo no lo trae). */
+  /** Uno de los momentos del instrumento (DIA: diagnostico | monitoreo | cierre). */
   @IsString()
   @IsNotEmpty()
   momento!: string;

@@ -1,8 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
-
-export const FUENTES_CARGA = ['dia'] as const; // ⏳ miAulaNotas, miAulaAsistencia, letrapps, sepa
-export type FuenteCarga = (typeof FUENTES_CARGA)[number];
+import { FUENTES_CARGA, type FuenteCarga } from '../fuentes';
 
 export const ESTADOS_CARGA = [
   'completada',

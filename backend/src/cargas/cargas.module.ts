@@ -5,11 +5,15 @@ import { CursosModule } from '../cursos/cursos.module';
 import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
 import { CargasController } from './cargas.controller';
 import { CargasService } from './cargas.service';
+import { AliasNombre, AliasNombreSchema } from './schemas/alias-nombre.schema';
 import { Carga, CargaSchema } from './schemas/carga.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Carga.name, schema: CargaSchema }]),
+    MongooseModule.forFeature([
+      { name: Carga.name, schema: CargaSchema },
+      { name: AliasNombre.name, schema: AliasNombreSchema },
+    ]),
     CursosModule,
     AlumnosModule,
     EvaluacionesModule,

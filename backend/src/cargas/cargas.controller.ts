@@ -16,7 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { Types } from 'mongoose';
 import {
-  RequierePermisos,
+  SoloAutenticado,
   UsuarioActual,
   type UsuarioAutorizado,
 } from '../comun/autorizacion';
@@ -25,28 +25,25 @@ import { CargaDto, ConfirmarCargaDto } from './dto/carga.dto';
 
 // Sin `dest`, multer deja el archivo en memoria: nunca se escribe en disco y se
 // descarta al terminar la petición (minimización, sección 8.4).
-const archivoXlsx = FileInterceptor('archivo', {
+const archivoEnMemoria = FileInterceptor('archivo', {
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
 });
 
 function validarArchivo(archivo?: ArchivoSubido): ArchivoSubido {
   if (!archivo) throw new BadRequestException('Falta el archivo');
-  if (!/\.xlsx$/i.test(archivo.originalname)) {
-    throw new BadRequestException('Solo se aceptan archivos .xlsx');
-  }
   return archivo;
 }
 
-// shortcut: todo exige `cargas.evaluaciones` porque la única fuente es el DIA; cuando
-// lleguen Mi Aula notas y asistencia, el permiso dependerá de la fuente.
+// El permiso depende de la fuente (fuentes.ts), así que lo revisa CargasService y
+// aquí solo se exige la sesión. Es la excepción a "cada endpoint con @RequierePermisos".
+@SoloAutenticado()
 @Controller('cargas')
 export class CargasController {
   constructor(private readonly cargasService: CargasService) {}
 
   @Post('vista-previa')
   @HttpCode(HttpStatus.OK)
-  @RequierePermisos('cargas.evaluaciones')
-  @UseInterceptors(archivoXlsx)
+  @UseInterceptors(archivoEnMemoria)
   previsualizar(
     @UploadedFile() archivo: ArchivoSubido | undefined,
     @Body() dto: CargaDto,
@@ -60,8 +57,7 @@ export class CargasController {
   }
 
   @Post()
-  @RequierePermisos('cargas.evaluaciones')
-  @UseInterceptors(archivoXlsx)
+  @UseInterceptors(archivoEnMemoria)
   confirmar(
     @UploadedFile() archivo: ArchivoSubido | undefined,
     @Body() dto: ConfirmarCargaDto,
@@ -77,14 +73,15 @@ export class CargasController {
   }
 
   @Get()
-  @RequierePermisos('cargas.evaluaciones')
-  listar() {
-    return this.cargasService.listar();
+  listar(@UsuarioActual() usuario: UsuarioAutorizado) {
+    return this.cargasService.listar(usuario);
   }
 
   @Get(':id')
-  @RequierePermisos('cargas.evaluaciones')
-  obtener(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
-    return this.cargasService.obtener(id);
+  obtener(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @UsuarioActual() usuario: UsuarioAutorizado,
+  ) {
+    return this.cargasService.obtener(id, usuario);
   }
 }

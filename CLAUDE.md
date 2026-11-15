@@ -67,7 +67,7 @@ En orden jerárquico: `directora` (acceso total), `inspectorGeneral`, `jefeTecni
 - Los permisos se guardan en la base de datos (colección `roles`) y la Directora los edita. No se codifican por rol en el código.
 - **Alcance por curso:** `roles.alcance` es `escuela` o `cursosAsignados`. Con `cursosAsignados` (hoy, `docente`) el usuario solo ve y carga datos de los cursos en `usuarios.cursoIds`. Esto se filtra en los servicios, no solo en el guard. Ver sección 7.4 del documento.
 - El `docente` sube notas y asistencia, ve la ficha y las alertas, y registra observaciones (no psicosociales ni PIE), siempre solo de sus cursos.
-- Cada endpoint exige su permiso con `@RequierePermisos('…')`.
+- Cada endpoint exige su permiso con `@RequierePermisos('…')`. Excepción: en `/api/cargas` el permiso depende de la fuente y lo revisa `CargasService`.
 
 **Implementación (backend):**
 
@@ -120,7 +120,7 @@ Despliegue: Docker Compose (`docker-compose.yml`; `docker-compose.dev.yml` para 
 | Base | Infraestructura y CI (PGT-42); entidades `cursos`, `asignaturas`, `alumnos` y `npm run semilla` (PGT-43); creación de cursos por año (`POST /api/cursos` y `/api/cursos/preparar-anio`) | — |
 | Acceso | Roles y permisos (PGT-7), login con Google (PGT-6) y administración de usuarios: `/api/usuarios` (PGT-51) | Otros 7 roles; pantallas de administración |
 | Lectura | `GET /api/cursos`, `GET /api/cursos/:id/alumnos` (PGT-56/57) y la ficha `GET /api/alumnos/:id` con auditoría (PGT-9) | Semáforo, alertas, notas y asistencia en la ficha |
-| Cargas | Carga del DIA con vista previa y confirmación: `/api/cargas` (PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion` y `cargas` | BullMQ, alias de nombres, Letrapps; Mi Aula y SEPA, bloqueados por el formato |
+| Cargas | Carga de evaluaciones externas por fuente (`cargas/fuentes.ts`), hoy con el DIA: vista previa, confirmación, permiso según la fuente y alias de nombres (`/api/cargas`, PGT-54); colecciones `tiposEvaluacion`, `resultadosEvaluacion`, `cargas` y `aliasNombres` | Lectores de Letrapps y SEPA; Mi Aula (nómina y asistencia llegaron en PDF, ver pendientes; notas sin formato); BullMQ |
 | Alertas | — | Motor, `reglasAlerta`, `alertas`, `estadosAlumno` (sección 5) |
 | Frontend | Login con Google y sesión real; layout con `Topbar` y `Sidebar` (menú según permisos) y TanStack Query. Rutas: `/` vista general (tabla de alumnos por curso con la API y dashboard con datos de ejemplo de `datos/ejemplo.ts`), `/alumnos/:id` ficha con los resultados del DIA y `/cargas` carga del DIA (permiso `cargas.evaluaciones`) | Dashboard con datos reales, administración y alertas |
 
@@ -134,32 +134,20 @@ Ajustes ya conversados con el equipo que todavía no están en el código. Al im
 4. **Auditoría pendiente:** cambios de usuarios, roles y permisos, los 403 del guard, `GET /api/auditoria` (con `auditoria.ver`) y unificar los nombres de las acciones (`inicioSesion` y `accesoDenegado` conviven con `ficha.ver` y `carga.crear`).
 5. **Aviso del popup de Google** ("Cross-Origin-Opener-Policy would block the window.postMessage call"): no rompe el login. Se silencia con el encabezado `Cross-Origin-Opener-Policy: same-origin-allow-popups` en Vite y Nginx.
 6. **Año académico** (idea, sin decidir): colección `aniosAcademicos` con año vigente, fechas de los semestres y cierre, para no depender de la fecha del sistema y bloquear cargas en años cerrados. Los datos **no** se guardan dentro del año: ya están separados por `anio` y `periodo`.
+7. **Mi Aula en PDF:** la escuela entregó la nómina de un curso y la asistencia en PDF. Antes de implementar: confirmar que el PDF trae texto (no una imagen escaneada), preguntar si Mi Aula exporta a Excel o CSV (preferible), y conseguir una muestra **anonimizada** para ver las columnas (¿la nómina trae RUT?, ¿la asistencia es diaria, mensual o semestral?). Orden: primero la nómina (crea a los alumnos reales y destraba la identificación de las demás cargas), después la asistencia (`asistencias`, sección 3.5) con sus alertas. Falta elegir la librería para leer PDF, que también servirá para Letrapps.
+8. **Frontend de cargas:** pasar a leer `resultados` en la vista previa (`porcentajesPorEje` y `porcentajeLogro` quedaron obsoletos) y, opcionalmente, avisar cuando una fila se identificó por alias (`porAlias`).
+9. **Dashboard** (`/?vista=dashboard`): sigue con datos de ejemplo de `frontend/src/datos/ejemplo.ts`. Pasarlo a datos reales cuando existan las alertas.
+10. **Ficha:** falta la sección "Notas y asistencia: pendiente de Mi Aula".
 
-### Tareas para la presentación (noviembre 2026)
+### Cómo agregar una prueba nueva (evaluación externa)
 
-Objetivo de la demo: iniciar sesión → ver los cursos → subir un DIA ficticio → resolver las filas dudosas → ver la ficha del alumno con su resultado. Todo con datos ficticios.
+1. Conseguir el formato real **anonimizado** y describirlo en la sección 4.4 de `ARQUITECTURA.md`. No se implementa con supuestos.
+2. Agregar el instrumento en `backend/src/evaluaciones/tipos-iniciales.ts` (código, áreas, niveles, momentos y campos). Se crea solo al iniciar la API.
+3. Escribir su lector en `backend/src/cargas/parsers/`, que devuelva un `ArchivoLeido` (`cargas/fuentes.ts`): curso, año, área y filas con `nombre` y `resultados`. Con su test unitario, usando un archivo **ficticio** armado en el test.
+4. Registrarlo en `FUENTES` (`cargas/fuentes.ts`) con su permiso y su extensión. El flujo de carga, los alias y la auditoría no se tocan.
+5. En el frontend, cambiar `fuente: null` por la fuente en `frontend/src/datos/tiposCarga.ts`.
 
-**Hecho (PR #20 a #23):** el recorrido completo funciona en el frontend y se probó de punta a punta con el DIA ficticio.
-
-| # | Tarea | Dónde quedó |
-|---|-------|-------------|
-| 1 | Script `npm run dia-ficticio` | PR #20 |
-| 2 | Pantalla principal con datos de la API | PR #22: la tabla de alumnos usa la API; el dashboard sigue con datos de ejemplo (ver pendientes) |
-| 3 | Vista de curso | PR #22: quedó dentro de `/`, con un selector de curso (`?curso=`), no en `/cursos/:id` |
-| 4 | Ficha `/alumnos/:id` | PR #22 y #23: datos, matrícula y resultados del DIA con los % por eje. ⏳ Falta la sección "Notas y asistencia: pendiente de Mi Aula" |
-| 5 | Carga `/cargas` | PR #22 y #23: un archivo por curso, vista previa, resolución de filas dudosas, cargas parciales y tarjetas que muestran lo ya cargado. No hay una lista aparte con el historial |
-
-**Pendiente:**
-
-| # | Tarea | Quién | Depende de |
-|---|-------|-------|------------|
-| 6 | Endpoint de resultados por curso (pendiente 1) para mostrar los % del DIA en la tabla de alumnos | Backend | Opcional para la demo |
-| 7 | Referencia de la API (pendiente 3), para que el frontend tenga un solo lugar donde mirar | Backend | — |
-| 8 | Preparar el equipo de la demo (ver "Puesta en marcha en un equipo nuevo") y ensayar el guion | Equipo | — |
-| 9 | Dashboard (`/?vista=dashboard`): hoy muestra datos de ejemplo de `frontend/src/datos/ejemplo.ts`, con la etiqueta "Datos de ejemplo". En la demo, presentarlo como diseño, o pasarlo a datos reales cuando existan las alertas | Frontend | Alertas (sección 5) |
-
-**Fuera de la demo:** alertas y semáforo (sin notas, asistencia ni cortes del DIA no hay datos para calcularlas), Letrapps, Mi Aula, SEPA, administración de usuarios en el frontend y los pendientes 2, 4 y 6.
-
+Las cargas de Mi Aula (nómina, notas y asistencia) no entran en este registro: guardan en otras colecciones y necesitan su propio servicio.
 
 ## Comandos
 
